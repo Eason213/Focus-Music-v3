@@ -48,6 +48,9 @@ export default function App() {
   const playerRef = useRef<any>(null);
   // Interval Ref for polling progress
   const progressInterval = useRef<any>(null);
+  
+  // Refs to hold latest state/functions for the stable YT event listener
+  const handleSongEndRef = useRef<() => void>(() => {});
 
   const currentCategory = CATEGORIES.find(c => c.id === selectedCategoryId) || CATEGORIES[0];
 
@@ -91,6 +94,24 @@ export default function App() {
   }, []);
 
   // ==================== YOUTUBE PLAYER INIT ====================
+  
+  // Static Event Handler for YT Player that delegates to the Ref
+  // This solves the "Stale Closure" problem where the player couldn't see the updated song list.
+  const onPlayerStateChangeStatic = (event: any) => {
+    if (event.data === 0) { // ENDED
+       handleSongEndRef.current();
+    }
+    if (event.data === 1) { // PLAYING
+       setIsPlaying(true);
+       if (event.target && event.target.getDuration) {
+          setDuration(event.target.getDuration());
+       }
+    }
+    if (event.data === 2) { // PAUSED
+       setIsPlaying(false);
+    }
+  };
+
   useEffect(() => {
     if (!window.YT) {
       const tag = document.createElement('script');
@@ -109,8 +130,8 @@ export default function App() {
           'autoplay': 0, 
         },
         events: {
-          'onReady': onPlayerReady,
-          'onStateChange': onPlayerStateChange,
+          'onReady': (event: any) => {},
+          'onStateChange': onPlayerStateChangeStatic,
           'onError': (e: any) => console.error("Player Error:", e)
         }
       });
@@ -138,22 +159,6 @@ export default function App() {
     return () => clearInterval(progressInterval.current);
   }, [isPlaying]);
 
-  const onPlayerReady = (event: any) => {
-    // Player Ready
-  };
-
-  const onPlayerStateChange = (event: any) => {
-    if (event.data === 0) { // ENDED
-      handleSongEnd();
-    }
-    if (event.data === 1) { // PLAYING
-       setIsPlaying(true);
-       if (playerRef.current) setDuration(playerRef.current.getDuration());
-    }
-    if (event.data === 2) { // PAUSED
-       setIsPlaying(false);
-    }
-  };
 
   // ==================== CONTROL HANDLERS ====================
 
@@ -178,18 +183,6 @@ export default function App() {
       playerRef.current?.playVideo();
     }
     setIsPlaying(!isPlaying);
-  };
-
-  // Logic for when a song finishes naturally
-  const handleSongEnd = () => {
-      if (repeatMode === 2) {
-          // Single Loop: Seek to 0 and play again
-          playerRef.current?.seekTo(0);
-          playerRef.current?.playVideo();
-      } else {
-          // Play Next (or stop if end of list and no repeat)
-          handleNext(true); 
-      }
   };
 
   const handleNext = (isAuto: boolean = false) => {
@@ -223,6 +216,24 @@ export default function App() {
     handlePlaySong(songs[nextIndex]);
   };
 
+  // Logic for when a song finishes naturally
+  const handleSongEnd = () => {
+      if (repeatMode === 2) {
+          // Single Loop: Seek to 0 and play again
+          playerRef.current?.seekTo(0);
+          playerRef.current?.playVideo();
+      } else {
+          // Play Next
+          handleNext(true); 
+      }
+  };
+
+  // Update the ref whenever handleSongEnd changes (which depends on songs, repeatMode, etc.)
+  // This ensures the static YT event listener calls the FRESH logic.
+  useEffect(() => {
+    handleSongEndRef.current = handleSongEnd;
+  });
+
   const handlePrev = () => {
     if (!currentSong || songs.length === 0) return;
     
@@ -236,8 +247,7 @@ export default function App() {
     const currentIndex = songs.findIndex(s => s.id === currentSong.id);
 
     if (isShuffle) {
-        // Previous in shuffle is tricky without history, just random again or previous in list
-        // For simplicity, let's go to previous in visual list
+         // In shuffle, prev just goes to previous in list for simplicity
          prevIndex = (currentIndex - 1 + songs.length) % songs.length;
     } else {
         prevIndex = (currentIndex - 1 + songs.length) % songs.length;
