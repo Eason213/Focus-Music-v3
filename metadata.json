@@ -1,0 +1,5 @@
+{
+  "name": "My Music Dashboard",
+  "description": "A personalized music dashboard simulating YouTube Music playlists powered by Gemini AI recommendations.",
+  "requestFramePermissions": []
+}
