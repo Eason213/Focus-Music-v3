@@ -20,7 +20,8 @@ export const fetchPlaylistByContext = async (
   try {
     // videoCategoryId=10 is "Music"
     // videoEmbeddable=true ensures we can play it in the iframe
-    const searchUrl = `${BASE_URL}/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&videoEmbeddable=true&key=${YOUTUBE_API_KEY}`;
+    // videoDuration=short ensures video is < 4 minutes
+    const searchUrl = `${BASE_URL}/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&videoEmbeddable=true&videoDuration=short&key=${YOUTUBE_API_KEY}`;
     
     const response = await fetch(searchUrl);
     const data = await response.json();

@@ -13,14 +13,14 @@ declare global {
   }
 }
 
-// Updated categories with specific YouTube search queries
+// Updated categories with specific YouTube search queries and correct names
 const CATEGORIES: PlaylistCategory[] = [
-  { id: 'rec', name: '入門推薦音樂', query: 'Popular music playlist 2024', description: 'Intro to Recommended Music', icon: '🎧' },
-  { id: 'old', name: '重溫舊愛', query: 'Classic hits 2000-2015 playlist', description: 'Relive Old Favorites', icon: '⏪' },
-  { id: 'mv', name: '專屬推薦音樂影片', query: 'Official Music Video playlist', description: 'Recommended Music Videos', icon: '🎬' },
-  { id: 'kpop', name: 'K-Pop hits', query: 'K-Pop Hits 2024 playlist', description: 'Latest K-Pop Hits', icon: '🕺' },
-  { id: 'sim_kpop', name: '風格近似 kpop', query: 'Songs similar to K-Pop', description: 'Similar to K-Pop', icon: '✨' },
-  { id: 'new', name: '最新發行', query: 'New music releases 2024', description: 'New Releases', icon: '🔥' },
+  { id: 'rec', name: '入門推薦音樂', query: 'Best pop music starter playlist', description: 'Intro to Recommended Music', icon: '🎧' },
+  { id: 'old', name: '重溫舊愛', query: 'Throwback hits 2000s 2010s music', description: 'Relive Old Favorites', icon: '⏪' },
+  { id: 'mv', name: '專屬推薦音樂影片', query: 'Official Music Video hits', description: 'Recommended Music Videos', icon: '🎬' },
+  { id: 'kpop', name: 'K-Pop熱門歌曲', query: 'K-Pop top hits 2024', description: 'Latest K-Pop Hits', icon: '🕺' },
+  { id: 'sim_kpop', name: '風格近似 kpop', query: 'Songs similar to K-Pop style', description: 'Similar to K-Pop', icon: '✨' },
+  { id: 'new', name: '最新發行', query: 'New music releases 2024 official audio', description: 'New Releases', icon: '🔥' },
 ];
 
 const USER_EMAIL = "kaco0213@gmail.com";
@@ -39,6 +39,10 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  
+  // Player Logic State
+  const [repeatMode, setRepeatMode] = useState<0 | 1 | 2>(0); // 0: Off, 1: All, 2: One
+  const [isShuffle, setIsShuffle] = useState(false);
 
   // YouTube Player Ref
   const playerRef = useRef<any>(null);
@@ -77,7 +81,6 @@ export default function App() {
 
   // Handle Search
   const handleSearch = (query: string) => {
-    // Reset category selection visually (optional, or keep it)
     setSelectedCategoryId(''); 
     loadSongs(query, true);
   };
@@ -85,7 +88,7 @@ export default function App() {
   // Initial load
   useEffect(() => {
     loadSongs(currentCategory.query);
-  }, []); // Run once on mount, let selection handler manage updates
+  }, []);
 
   // ==================== YOUTUBE PLAYER INIT ====================
   useEffect(() => {
@@ -103,6 +106,7 @@ export default function App() {
         playerVars: {
           'playsinline': 1,
           'controls': 0,
+          'autoplay': 0, 
         },
         events: {
           'onReady': onPlayerReady,
@@ -140,7 +144,7 @@ export default function App() {
 
   const onPlayerStateChange = (event: any) => {
     if (event.data === 0) { // ENDED
-      handleNext();
+      handleSongEnd();
     }
     if (event.data === 1) { // PLAYING
        setIsPlaying(true);
@@ -176,18 +180,70 @@ export default function App() {
     setIsPlaying(!isPlaying);
   };
 
-  const handleNext = () => {
-    if (!currentSong) return;
-    const idx = songs.findIndex(s => s.id === currentSong.id);
-    const nextIdx = (idx + 1) % songs.length;
-    handlePlaySong(songs[nextIdx]);
+  // Logic for when a song finishes naturally
+  const handleSongEnd = () => {
+      if (repeatMode === 2) {
+          // Single Loop: Seek to 0 and play again
+          playerRef.current?.seekTo(0);
+          playerRef.current?.playVideo();
+      } else {
+          // Play Next (or stop if end of list and no repeat)
+          handleNext(true); 
+      }
+  };
+
+  const handleNext = (isAuto: boolean = false) => {
+    if (!currentSong || songs.length === 0) return;
+    
+    let nextIndex = 0;
+    const currentIndex = songs.findIndex(s => s.id === currentSong.id);
+
+    if (isShuffle) {
+        // Pick a random index that isn't the current one (unless length is 1)
+        if (songs.length > 1) {
+            do {
+                nextIndex = Math.floor(Math.random() * songs.length);
+            } while (nextIndex === currentIndex);
+        }
+    } else {
+        // Normal Order
+        if (currentIndex === songs.length - 1) {
+            // End of list
+            if (repeatMode === 0 && isAuto) {
+                // Stop if no repeat and auto-advanced
+                setIsPlaying(false);
+                return; 
+            }
+            nextIndex = 0; // Loop back to start
+        } else {
+            nextIndex = currentIndex + 1;
+        }
+    }
+
+    handlePlaySong(songs[nextIndex]);
   };
 
   const handlePrev = () => {
-    if (!currentSong) return;
-    const idx = songs.findIndex(s => s.id === currentSong.id);
-    const prevIdx = (idx - 1 + songs.length) % songs.length;
-    handlePlaySong(songs[prevIdx]);
+    if (!currentSong || songs.length === 0) return;
+    
+    // If more than 3 seconds in, restart song
+    if (currentTime > 3) {
+        playerRef.current?.seekTo(0);
+        return;
+    }
+
+    let prevIndex = 0;
+    const currentIndex = songs.findIndex(s => s.id === currentSong.id);
+
+    if (isShuffle) {
+        // Previous in shuffle is tricky without history, just random again or previous in list
+        // For simplicity, let's go to previous in visual list
+         prevIndex = (currentIndex - 1 + songs.length) % songs.length;
+    } else {
+        prevIndex = (currentIndex - 1 + songs.length) % songs.length;
+    }
+
+    handlePlaySong(songs[prevIndex]);
   };
 
   const handleSeek = (time: number) => {
@@ -196,6 +252,9 @@ export default function App() {
       setCurrentTime(time);
     }
   };
+
+  const toggleRepeat = () => setRepeatMode((prev) => (prev + 1) % 3 as 0 | 1 | 2);
+  const toggleShuffle = () => setIsShuffle(!isShuffle);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-black text-white font-sans selection:bg-pink-500/30 selection:text-white">
@@ -221,7 +280,6 @@ export default function App() {
       <main className="flex-1 h-full overflow-hidden flex flex-col relative z-10">
         <div className="md:hidden bg-black/50 backdrop-blur-xl p-4 border-b border-white/5 flex items-center justify-between sticky top-0 z-30">
            <span className="font-bold text-white text-lg tracking-tight">Music</span>
-           {/* Simple mobile select fallback, doesn't support search well */}
            <select 
               className="bg-zinc-800/50 text-sm p-2 rounded-lg text-white border-none outline-none backdrop-blur-md"
               value={selectedCategoryId}
@@ -245,11 +303,15 @@ export default function App() {
           currentSong={currentSong}
           isPlaying={isPlaying}
           onTogglePlay={handleTogglePlay}
-          onNext={handleNext}
+          onNext={() => handleNext(false)}
           onPrev={handlePrev}
           currentTime={currentTime}
           duration={duration}
           onSeek={handleSeek}
+          repeatMode={repeatMode}
+          isShuffle={isShuffle}
+          onToggleRepeat={toggleRepeat}
+          onToggleShuffle={toggleShuffle}
         />
       </main>
     </div>

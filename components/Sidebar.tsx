@@ -72,21 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
           ))}
         </nav>
         
-        {/* User Profile */}
-        <div className="mt-4 pt-4 border-t border-white/5">
-             <div className="p-3 bg-gradient-to-r from-zinc-800/40 to-zinc-900/40 rounded-2xl border border-white/5 flex items-center gap-3 backdrop-blur-md">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white shadow-inner">
-                    {userEmail.charAt(0).toUpperCase()}
-                </div>
-                <div className="overflow-hidden">
-                    <p className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider">Signed in as</p>
-                    <p className="text-xs text-white truncate font-medium">{userEmail.split('@')[0]}</p>
-                </div>
-            </div>
-            <p className="text-[10px] text-zinc-600 font-medium text-center mt-3 tracking-wide uppercase">
-                iOS 26 Concept
-            </p>
-        </div>
+        {/* Footer Area Removed as requested */}
       </div>
     </div>
   );
