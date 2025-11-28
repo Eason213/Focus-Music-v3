@@ -4,14 +4,14 @@ import { Song } from "../types";
 // ⚠️ 重要：請在下方引號中填入您的 YouTube Data API v3 Key
 // 申請網址: https://console.cloud.google.com/apis/library/youtube.googleapis.com
 // ==================================================================================
-const YOUTUBE_API_KEY = "在此處填入您的_YOUTUBE_API_KEY"; 
+const YOUTUBE_API_KEY = "AIzaSyBpy0IZXf9kkkPh2FlO-UMTVXUSmNqqyTQ"; 
 
 const BASE_URL = "https://www.googleapis.com/youtube/v3";
 
 export const fetchPlaylistByContext = async (
   query: string
 ): Promise<Song[]> => {
-  if (YOUTUBE_API_KEY === "AIzaSyBpy0IZXf9kkkPh2FlO-UMTVXUSmNqqyTQ" || !YOUTUBE_API_KEY) {
+  if (YOUTUBE_API_KEY === "在此處填入您的_YOUTUBE_API_KEY" || !YOUTUBE_API_KEY) {
     console.error("API Key is missing. Please set it in services/youtubeService.ts");
     // 回傳假資料以免程式崩潰，提醒使用者
     return mockFallbackData();
