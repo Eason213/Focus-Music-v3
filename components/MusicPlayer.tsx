@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Song } from '../types';
 
 interface MusicPlayerProps {
@@ -32,6 +32,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 }) => {
   const [localProgress, setLocalProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isDragging) {
@@ -52,9 +53,23 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   const handleSeekStart = () => setIsDragging(true);
   
-  const handleSeekEnd = () => {
+  const handleSeekEnd = (e: any) => {
     setIsDragging(false);
-    onSeek(localProgress);
+    // Use the value from the input which is bound to localProgress
+    onSeek(Number(e.target.value));
+  };
+
+  // Handle direct tap on the progress bar wrapper
+  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!progressBarRef.current || !duration) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const percentage = Math.max(0, Math.min(1, x / width));
+    const newTime = percentage * duration;
+    
+    setLocalProgress(newTime);
+    onSeek(newTime);
   };
 
   return (
@@ -67,7 +82,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                 <span>{formatTime(localProgress)}</span>
                 <span>{formatTime(duration)}</span>
             </div>
-            <div className="relative group w-full h-4 flex items-center">
+            
+            <div 
+                ref={progressBarRef}
+                className="relative group w-full h-4 flex items-center cursor-pointer"
+                onClick={handleTrackClick}
+            >
+                 {/* Invisible Input for Dragging */}
                  <input 
                     type="range"
                     min={0}
@@ -80,12 +101,15 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     onTouchEnd={handleSeekEnd}
                     className="absolute z-20 w-full h-full opacity-0 cursor-pointer"
                  />
-                 <div className="w-full h-1 bg-zinc-700/50 rounded-full overflow-hidden relative">
+                 
+                 {/* Visual Track */}
+                 <div className="w-full h-1 bg-zinc-700/50 rounded-full overflow-hidden relative pointer-events-none">
                     <div 
                         className="h-full bg-white rounded-full transition-all duration-100 ease-linear"
                         style={{ width: `${(localProgress / (duration || 1)) * 100}%` }}
                     ></div>
                  </div>
+                 
                  {/* Thumb indicator */}
                  <div 
                     className="absolute h-3 w-3 bg-white rounded-full shadow-md z-10 pointer-events-none transition-all duration-100"

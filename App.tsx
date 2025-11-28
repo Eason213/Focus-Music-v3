@@ -44,6 +44,7 @@ export default function App() {
   // Player Logic State
   const [repeatMode, setRepeatMode] = useState<0 | 1 | 2>(0); // 0: Off, 1: All, 2: One
   const [isShuffle, setIsShuffle] = useState(false);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
 
   // YouTube Player Ref
   const playerRef = useRef<any>(null);
@@ -97,7 +98,6 @@ export default function App() {
   // ==================== YOUTUBE PLAYER INIT ====================
   
   // Static Event Handler for YT Player that delegates to the Ref
-  // This solves the "Stale Closure" problem where the player couldn't see the updated song list.
   const onPlayerStateChangeStatic = (event: any) => {
     if (event.data === 0) { // ENDED
        handleSongEndRef.current();
@@ -129,9 +129,14 @@ export default function App() {
           'playsinline': 1,
           'controls': 0,
           'autoplay': 0, 
+          'disablekb': 1,
+          'fs': 0,
+          'iv_load_policy': 3,
         },
         events: {
-          'onReady': (event: any) => {},
+          'onReady': (event: any) => {
+             setIsPlayerReady(true);
+          },
           'onStateChange': onPlayerStateChangeStatic,
           'onError': (e: any) => console.error("Player Error:", e)
         }
@@ -153,7 +158,7 @@ export default function App() {
           setCurrentTime(curr);
           if (dur > 0) setDuration(dur);
         }
-      }, 1000);
+      }, 500); // Poll faster for smoother slider
     } else {
       if (progressInterval.current) clearInterval(progressInterval.current);
     }
@@ -167,8 +172,12 @@ export default function App() {
     setCurrentSong(song);
     setIsPlaying(true);
     setCurrentTime(0);
+    
+    // CRITICAL for iOS: Call player methods synchronously in the event handler if possible,
+    // or as close as possible. Do not wait for useEffect.
     if (playerRef.current && playerRef.current.loadVideoById) {
       playerRef.current.loadVideoById(song.id);
+      playerRef.current.playVideo(); // Force play for iOS
     }
   };
 
@@ -180,10 +189,11 @@ export default function App() {
 
     if (isPlaying) {
       playerRef.current?.pauseVideo();
+      setIsPlaying(false); // Optimistic UI update
     } else {
       playerRef.current?.playVideo();
+      setIsPlaying(true); // Optimistic UI update
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleNext = (isAuto: boolean = false) => {
@@ -221,8 +231,10 @@ export default function App() {
   const handleSongEnd = () => {
       if (repeatMode === 2) {
           // Single Loop: Seek to 0 and play again
-          playerRef.current?.seekTo(0);
-          playerRef.current?.playVideo();
+          if (playerRef.current) {
+            playerRef.current.seekTo(0);
+            playerRef.current.playVideo();
+          }
       } else {
           // Play Next
           handleNext(true); 
@@ -248,7 +260,6 @@ export default function App() {
     const currentIndex = songs.findIndex(s => s.id === currentSong.id);
 
     if (isShuffle) {
-         // In shuffle, prev just goes to previous in list for simplicity
          prevIndex = (currentIndex - 1 + songs.length) % songs.length;
     } else {
         prevIndex = (currentIndex - 1 + songs.length) % songs.length;
@@ -261,6 +272,11 @@ export default function App() {
     if (playerRef.current) {
       playerRef.current.seekTo(time, true);
       setCurrentTime(time);
+      // Ensure it plays after seek (sometimes iOS pauses)
+      if (!isPlaying) {
+          playerRef.current.playVideo();
+          setIsPlaying(true);
+      }
     }
   };
 
