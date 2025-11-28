@@ -7,6 +7,7 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   userEmail: string;
   onSearch: (query: string) => void;
+  onClose?: () => void; // Optional prop for closing sidebar on mobile
 }
 
 // Predefined hot keywords for auto-recommendation
@@ -19,7 +20,7 @@ const POPULAR_KEYWORDS = [
 
 const MAX_HISTORY_ITEMS = 5;
 
-export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSelect, userEmail, onSearch }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSelect, userEmail, onSearch, onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [isFocused, setIsFocused] = useState(false);
@@ -80,16 +81,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
   };
 
   return (
-    <div className="w-full md:w-[280px] bg-zinc-900/80 backdrop-blur-2xl flex flex-col h-full border-r border-white/5 flex-shrink-0 relative">
-      <div className="p-6 pt-10 flex flex-col h-full">
+    <div className="w-full md:w-[280px] bg-zinc-900/95 backdrop-blur-2xl flex flex-col h-full border-r border-white/5 flex-shrink-0 relative">
+      <div className="p-6 pt-safe-top flex flex-col h-full">
         {/* Logo Area */}
-        <div className="flex items-center gap-3 mb-8 px-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-red-600 flex items-center justify-center shadow-lg shadow-pink-500/30">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-white">
-              <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-            </svg>
+        <div className="flex items-center justify-between mb-8 px-2 mt-4 md:mt-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-red-600 flex items-center justify-center shadow-lg shadow-pink-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-white">
+                <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <span className="text-2xl font-bold tracking-tight text-white">Music</span>
           </div>
-          <span className="text-2xl font-bold tracking-tight text-white">Music</span>
+          
+          {/* Close Button for Mobile */}
+          {onClose && (
+            <button 
+              onClick={onClose}
+              className="md:hidden p-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Search Bar Container */}

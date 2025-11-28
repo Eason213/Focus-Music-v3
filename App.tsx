@@ -35,6 +35,9 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQueryDisplay, setSearchQueryDisplay] = useState('');
 
+  // Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Playback State
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -78,6 +81,7 @@ export default function App() {
   // Handle Category Selection
   const handleCategorySelect = (id: string) => {
     setSelectedCategoryId(id);
+    setIsMobileMenuOpen(false); // Close mobile menu on select
     const cat = CATEGORIES.find(c => c.id === id);
     if (cat) {
       loadSongs(cat.query);
@@ -87,6 +91,7 @@ export default function App() {
   // Handle Search
   const handleSearch = (query: string) => {
     setSelectedCategoryId(''); 
+    setIsMobileMenuOpen(false); // Close mobile menu on search
     loadSongs(query, true);
   };
 
@@ -94,6 +99,39 @@ export default function App() {
   useEffect(() => {
     loadSongs(currentCategory.query);
   }, []);
+
+  // Update Document Title for Lock Screen Info
+  useEffect(() => {
+    if (currentSong) {
+      document.title = `${currentSong.title} • ${currentSong.artist}`;
+    } else {
+      document.title = "Music";
+    }
+  }, [currentSong]);
+
+  // ==================== IOS PWA BACKGROUND PLAYBACK FIX ====================
+  // 監聽 visibilitychange 事件：當使用者回到桌面時，強制恢復播放
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // 狀態：'hidden' 表示 App 進入背景 (回到桌面或鎖定螢幕)
+      if (document.visibilityState === 'hidden' && isPlaying) {
+         console.log("App went background, forcing playback...");
+         
+         // iOS Safari 會在進入背景時自動暫停，我們設置一個微小的延遲來 "反擊" 這個行為
+         // 強制再次呼叫 playVideo 以保持 Audio Session 活躍
+         setTimeout(() => {
+            if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+               playerRef.current.playVideo();
+            }
+         }, 100);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isPlaying]);
 
   // ==================== MEDIA SESSION API (iOS Control Center) ====================
   const updateMediaSession = useCallback((song: Song | null) => {
@@ -150,6 +188,8 @@ export default function App() {
        }
     }
     if (event.data === 2) { // PAUSED
+       // 如果不是我們主動暫停 (例如是系統自動暫停)，且我們希望它是播放狀態，這裡可以做檢查
+       // 但在 React state 中我們通常信任播放器的回調
        setIsPlaying(false);
     }
   };
@@ -354,6 +394,29 @@ export default function App() {
          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-900/20 rounded-full blur-[150px] animate-pulse"></div>
       </div>
 
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-[60] md:hidden">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+              onClick={() => setIsMobileMenuOpen(false)}
+            ></div>
+            {/* Slide-in Menu */}
+            <div className="absolute inset-y-0 left-0 w-[85%] max-w-[320px] shadow-2xl animate-in slide-in-from-left duration-300">
+               <Sidebar 
+                  categories={CATEGORIES} 
+                  selectedId={selectedCategoryId} 
+                  onSelect={handleCategorySelect}
+                  userEmail={USER_EMAIL}
+                  onSearch={handleSearch}
+                  onClose={() => setIsMobileMenuOpen(false)}
+                />
+            </div>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
       <div className="hidden md:flex h-full z-20 relative">
         <Sidebar 
           categories={CATEGORIES} 
@@ -365,10 +428,25 @@ export default function App() {
       </div>
 
       <main className="flex-1 h-full overflow-hidden flex flex-col relative z-10">
-        <div className="md:hidden bg-black/50 backdrop-blur-xl p-4 border-b border-white/5 flex items-center justify-between sticky top-0 z-30">
-           <span className="font-bold text-white text-lg tracking-tight">Music</span>
+        
+        {/* Mobile Header */}
+        <div className="md:hidden bg-zinc-900/80 backdrop-blur-xl p-4 border-b border-white/5 flex items-center gap-4 sticky top-0 z-30 pt-safe-top">
+           {/* Hamburger Menu Button */}
+           <button 
+             onClick={() => setIsMobileMenuOpen(true)}
+             className="p-2 -ml-2 text-white hover:bg-white/10 rounded-full transition-colors"
+             aria-label="Open Menu"
+           >
+             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+             </svg>
+           </button>
+           
+           <span className="font-bold text-white text-lg tracking-tight truncate flex-1">Music</span>
+           
+           {/* Quick Category Select (Optional on mobile since we have sidebar now, but kept for convenience) */}
            <select 
-              className="bg-zinc-800/50 text-sm p-2 rounded-lg text-white border-none outline-none backdrop-blur-md"
+              className="bg-zinc-800/50 text-sm p-2 rounded-lg text-white border-none outline-none backdrop-blur-md max-w-[150px]"
               value={selectedCategoryId}
               onChange={(e) => handleCategorySelect(e.target.value)}
            >
