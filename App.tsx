@@ -30,37 +30,65 @@ export default function App() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loadingState, setLoadingState] = useState<LoadingState>(LoadingState.IDLE);
   
+  // Search State
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQueryDisplay, setSearchQueryDisplay] = useState('');
+
   // Playback State
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   // YouTube Player Ref
   const playerRef = useRef<any>(null);
+  // Interval Ref for polling progress
+  const progressInterval = useRef<any>(null);
 
   const currentCategory = CATEGORIES.find(c => c.id === selectedCategoryId) || CATEGORIES[0];
 
-  const loadSongs = useCallback(async () => {
+  const loadSongs = useCallback(async (query: string, isSearch: boolean = false) => {
     setLoadingState(LoadingState.LOADING);
     setSongs([]);
     try {
-      // Fetch using the new YouTube Service
-      const data = await fetchPlaylistByContext(currentCategory.query);
+      const data = await fetchPlaylistByContext(query);
       setSongs(data);
       setLoadingState(LoadingState.SUCCESS);
+      if (isSearch) {
+        setIsSearching(true);
+        setSearchQueryDisplay(query);
+      } else {
+        setIsSearching(false);
+      }
     } catch (error) {
       console.error(error);
       setLoadingState(LoadingState.ERROR);
     }
-  }, [currentCategory]);
+  }, []);
 
-  // Initial load or when category changes
+  // Handle Category Selection
+  const handleCategorySelect = (id: string) => {
+    setSelectedCategoryId(id);
+    const cat = CATEGORIES.find(c => c.id === id);
+    if (cat) {
+      loadSongs(cat.query);
+    }
+  };
+
+  // Handle Search
+  const handleSearch = (query: string) => {
+    // Reset category selection visually (optional, or keep it)
+    setSelectedCategoryId(''); 
+    loadSongs(query, true);
+  };
+
+  // Initial load
   useEffect(() => {
-    loadSongs();
-  }, [loadSongs]);
+    loadSongs(currentCategory.query);
+  }, []); // Run once on mount, let selection handler manage updates
 
   // ==================== YOUTUBE PLAYER INIT ====================
   useEffect(() => {
-    // Load YouTube IFrame API
     if (!window.YT) {
       const tag = document.createElement('script');
       tag.src = "https://www.youtube.com/iframe_api";
@@ -68,7 +96,6 @@ export default function App() {
       firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
     }
 
-    // Callback when API is ready
     window.onYouTubeIframeAPIReady = () => {
       playerRef.current = new window.YT.Player('youtube-player', {
         height: '0',
@@ -79,33 +106,47 @@ export default function App() {
         },
         events: {
           'onReady': onPlayerReady,
-          'onStateChange': onPlayerStateChange
+          'onStateChange': onPlayerStateChange,
+          'onError': (e: any) => console.error("Player Error:", e)
         }
       });
     };
 
-    // If API is already loaded (e.g. re-render), ensure player is init
     if (window.YT && window.YT.Player && !playerRef.current) {
         window.onYouTubeIframeAPIReady();
     }
   }, []);
 
+  // Poll for Progress
+  useEffect(() => {
+    if (isPlaying) {
+      progressInterval.current = setInterval(() => {
+        if (playerRef.current && playerRef.current.getCurrentTime) {
+          const curr = playerRef.current.getCurrentTime();
+          const dur = playerRef.current.getDuration();
+          setCurrentTime(curr);
+          if (dur > 0) setDuration(dur);
+        }
+      }, 1000);
+    } else {
+      if (progressInterval.current) clearInterval(progressInterval.current);
+    }
+    return () => clearInterval(progressInterval.current);
+  }, [isPlaying]);
+
   const onPlayerReady = (event: any) => {
-    // Player is ready
-    // event.target.setVolume(100);
+    // Player Ready
   };
 
   const onPlayerStateChange = (event: any) => {
-    // YT.PlayerState.ENDED = 0
-    if (event.data === 0) {
+    if (event.data === 0) { // ENDED
       handleNext();
     }
-    // YT.PlayerState.PLAYING = 1
-    if (event.data === 1) {
+    if (event.data === 1) { // PLAYING
        setIsPlaying(true);
+       if (playerRef.current) setDuration(playerRef.current.getDuration());
     }
-    // YT.PlayerState.PAUSED = 2
-    if (event.data === 2) {
+    if (event.data === 2) { // PAUSED
        setIsPlaying(false);
     }
   };
@@ -115,6 +156,7 @@ export default function App() {
   const handlePlaySong = (song: Song) => {
     setCurrentSong(song);
     setIsPlaying(true);
+    setCurrentTime(0);
     if (playerRef.current && playerRef.current.loadVideoById) {
       playerRef.current.loadVideoById(song.id);
     }
@@ -148,10 +190,16 @@ export default function App() {
     handlePlaySong(songs[prevIdx]);
   };
 
+  const handleSeek = (time: number) => {
+    if (playerRef.current) {
+      playerRef.current.seekTo(time, true);
+      setCurrentTime(time);
+    }
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-black text-white font-sans selection:bg-pink-500/30 selection:text-white">
       
-      {/* Hidden YouTube Player Div */}
       <div id="youtube-player" className="absolute -top-[1000px] -left-[1000px] pointer-events-none opacity-0"></div>
 
       {/* Background Ambient Glow */}
@@ -164,18 +212,20 @@ export default function App() {
         <Sidebar 
           categories={CATEGORIES} 
           selectedId={selectedCategoryId} 
-          onSelect={setSelectedCategoryId}
+          onSelect={handleCategorySelect}
           userEmail={USER_EMAIL}
+          onSearch={handleSearch}
         />
       </div>
 
       <main className="flex-1 h-full overflow-hidden flex flex-col relative z-10">
         <div className="md:hidden bg-black/50 backdrop-blur-xl p-4 border-b border-white/5 flex items-center justify-between sticky top-0 z-30">
            <span className="font-bold text-white text-lg tracking-tight">Music</span>
+           {/* Simple mobile select fallback, doesn't support search well */}
            <select 
               className="bg-zinc-800/50 text-sm p-2 rounded-lg text-white border-none outline-none backdrop-blur-md"
               value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
+              onChange={(e) => handleCategorySelect(e.target.value)}
            >
              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
            </select>
@@ -184,8 +234,8 @@ export default function App() {
         <SongList 
           songs={songs} 
           loadingState={loadingState} 
-          categoryName={currentCategory.name}
-          onRefresh={loadSongs}
+          categoryName={isSearching ? `Search: "${searchQueryDisplay}"` : currentCategory.name}
+          onRefresh={() => loadSongs(isSearching ? searchQueryDisplay : currentCategory.query, isSearching)}
           onPlay={handlePlaySong}
           currentSong={currentSong}
           isPlaying={isPlaying}
@@ -197,6 +247,9 @@ export default function App() {
           onTogglePlay={handleTogglePlay}
           onNext={handleNext}
           onPrev={handlePrev}
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={handleSeek}
         />
       </main>
     </div>

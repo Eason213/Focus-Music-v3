@@ -18,9 +18,9 @@ export const fetchPlaylistByContext = async (
   }
 
   try {
-    // 1. Search for videos based on the query (treating category name as query)
     // videoCategoryId=10 is "Music"
-    const searchUrl = `${BASE_URL}/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&key=${YOUTUBE_API_KEY}`;
+    // videoEmbeddable=true ensures we can play it in the iframe
+    const searchUrl = `${BASE_URL}/search?part=snippet&maxResults=20&q=${encodeURIComponent(query)}&type=video&videoCategoryId=10&videoEmbeddable=true&key=${YOUTUBE_API_KEY}`;
     
     const response = await fetch(searchUrl);
     const data = await response.json();
@@ -34,8 +34,8 @@ export const fetchPlaylistByContext = async (
       id: item.id.videoId,
       title: decodeHTMLEntities(item.snippet.title),
       artist: item.snippet.channelTitle,
-      album: item.snippet.channelTitle, // YouTube doesn't give album info easily in search
-      duration: "3:45", // Search API doesn't return duration, requires a second call to 'videos' endpoint. Hardcoded for UI demo.
+      album: item.snippet.channelTitle, 
+      duration: "0:00", // Will be updated by player when loaded
       thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url,
       year: item.snippet.publishedAt.substring(0, 4)
     }));
@@ -46,7 +46,7 @@ export const fetchPlaylistByContext = async (
   }
 };
 
-// Helper to decode HTML entities (e.g. &#39; -> ')
+// Helper to decode HTML entities
 function decodeHTMLEntities(text: string) {
   const textArea = document.createElement('textarea');
   textArea.innerHTML = text;
@@ -55,6 +55,6 @@ function decodeHTMLEntities(text: string) {
 
 // Fallback data if API Key is missing
 const mockFallbackData = (): Song[] => [
-    { id: '1', title: 'API KEY MISSING', artist: 'Please update code', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/000000/FFF?text=No+Key', year: '2024' },
-    { id: '2', title: 'Go to services/youtubeService.ts', artist: 'Instruction', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/000000/FFF?text=Edit+File', year: '2024' },
+    { id: '1', title: 'API KEY MISSING', artist: 'Please update services/youtubeService.ts', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/333/FFF?text=No+Key', year: '2024' },
+    { id: '2', title: 'Search Feature', artist: 'Requires valid API Key', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/333/FFF?text=Search', year: '2024' },
 ];
