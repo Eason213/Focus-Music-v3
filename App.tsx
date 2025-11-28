@@ -95,6 +95,47 @@ export default function App() {
     loadSongs(currentCategory.query);
   }, []);
 
+  // ==================== MEDIA SESSION API (iOS Control Center) ====================
+  const updateMediaSession = useCallback((song: Song | null) => {
+    if (!('mediaSession' in navigator) || !song) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      artwork: [
+        { src: song.thumbnail, sizes: '512x512', type: 'image/jpeg' }
+      ]
+    });
+
+    // Handlers
+    navigator.mediaSession.setActionHandler('play', () => {
+        handleTogglePlay();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+        handleTogglePlay();
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+        handlePrev();
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+        handleNext(false);
+    });
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime && details.fastSeek === undefined) {
+             handleSeek(details.seekTime);
+        }
+    });
+  }, [songs, isShuffle, repeatMode]); // Deps needed for handlers to access latest state via closures if not refactored, but here we invoke functions that use refs or fresh state.
+
+  // Update playback state in Media Session
+  useEffect(() => {
+      if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      }
+  }, [isPlaying]);
+
+
   // ==================== YOUTUBE PLAYER INIT ====================
   
   // Static Event Handler for YT Player that delegates to the Ref
@@ -123,15 +164,16 @@ export default function App() {
 
     window.onYouTubeIframeAPIReady = () => {
       playerRef.current = new window.YT.Player('youtube-player', {
-        height: '0',
-        width: '0',
+        height: '100%',
+        width: '100%',
         playerVars: {
-          'playsinline': 1,
+          'playsinline': 1, // Crucial for iOS
           'controls': 0,
           'autoplay': 0, 
           'disablekb': 1,
           'fs': 0,
           'iv_load_policy': 3,
+          'origin': window.location.origin
         },
         events: {
           'onReady': (event: any) => {
@@ -157,8 +199,17 @@ export default function App() {
           const dur = playerRef.current.getDuration();
           setCurrentTime(curr);
           if (dur > 0) setDuration(dur);
+          
+          // Update Media Session Position State (Experimental but good for lock screen slider)
+          if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+             navigator.mediaSession.setPositionState({
+                 duration: dur,
+                 playbackRate: 1,
+                 position: curr
+             });
+          }
         }
-      }, 500); // Poll faster for smoother slider
+      }, 500); 
     } else {
       if (progressInterval.current) clearInterval(progressInterval.current);
     }
@@ -173,8 +224,10 @@ export default function App() {
     setIsPlaying(true);
     setCurrentTime(0);
     
-    // CRITICAL for iOS: Call player methods synchronously in the event handler if possible,
-    // or as close as possible. Do not wait for useEffect.
+    // Update iOS Media Center
+    updateMediaSession(song);
+
+    // CRITICAL for iOS: Call player methods synchronously in the event handler if possible.
     if (playerRef.current && playerRef.current.loadVideoById) {
       playerRef.current.loadVideoById(song.id);
       playerRef.current.playVideo(); // Force play for iOS
@@ -189,10 +242,10 @@ export default function App() {
 
     if (isPlaying) {
       playerRef.current?.pauseVideo();
-      setIsPlaying(false); // Optimistic UI update
+      setIsPlaying(false); 
     } else {
       playerRef.current?.playVideo();
-      setIsPlaying(true); // Optimistic UI update
+      setIsPlaying(true); 
     }
   };
 
@@ -203,22 +256,18 @@ export default function App() {
     const currentIndex = songs.findIndex(s => s.id === currentSong.id);
 
     if (isShuffle) {
-        // Pick a random index that isn't the current one (unless length is 1)
         if (songs.length > 1) {
             do {
                 nextIndex = Math.floor(Math.random() * songs.length);
             } while (nextIndex === currentIndex);
         }
     } else {
-        // Normal Order
         if (currentIndex === songs.length - 1) {
-            // End of list
             if (repeatMode === 0 && isAuto) {
-                // Stop if no repeat and auto-advanced
                 setIsPlaying(false);
                 return; 
             }
-            nextIndex = 0; // Loop back to start
+            nextIndex = 0; 
         } else {
             nextIndex = currentIndex + 1;
         }
@@ -227,10 +276,9 @@ export default function App() {
     handlePlaySong(songs[nextIndex]);
   };
 
-  // Logic for when a song finishes naturally
   const handleSongEnd = () => {
       if (repeatMode === 2) {
-          // Single Loop: Seek to 0 and play again
+          // Single Loop
           if (playerRef.current) {
             playerRef.current.seekTo(0);
             playerRef.current.playVideo();
@@ -241,16 +289,21 @@ export default function App() {
       }
   };
 
-  // Update the ref whenever handleSongEnd changes (which depends on songs, repeatMode, etc.)
-  // This ensures the static YT event listener calls the FRESH logic.
+  // Update the ref whenever handleSongEnd changes
   useEffect(() => {
     handleSongEndRef.current = handleSongEnd;
   });
 
+  // Re-attach handlers to media session when dependencies change (like song list order for next/prev)
+  useEffect(() => {
+    if(currentSong) {
+        updateMediaSession(currentSong);
+    }
+  }, [currentSong, updateMediaSession]);
+
   const handlePrev = () => {
     if (!currentSong || songs.length === 0) return;
     
-    // If more than 3 seconds in, restart song
     if (currentTime > 3) {
         playerRef.current?.seekTo(0);
         return;
@@ -272,7 +325,6 @@ export default function App() {
     if (playerRef.current) {
       playerRef.current.seekTo(time, true);
       setCurrentTime(time);
-      // Ensure it plays after seek (sometimes iOS pauses)
       if (!isPlaying) {
           playerRef.current.playVideo();
           setIsPlaying(true);
@@ -286,7 +338,15 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-black text-white font-sans selection:bg-pink-500/30 selection:text-white">
       
-      <div id="youtube-player" className="absolute -top-[1000px] -left-[1000px] pointer-events-none opacity-0"></div>
+      {/* 
+         iOS Optimization: 
+         Keep player technically 'visible' (1x1 pixel) but invisible to user. 
+         Completely off-screen (top: -1000px) causes iOS Safari to pause audio in background.
+      */}
+      <div 
+        id="youtube-player" 
+        className="absolute top-0 left-0 w-px h-px opacity-[0.01] pointer-events-none z-0 overflow-hidden"
+      ></div>
 
       {/* Background Ambient Glow */}
       <div className="fixed inset-0 z-0 pointer-events-none">
