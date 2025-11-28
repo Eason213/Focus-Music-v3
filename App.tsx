@@ -14,13 +14,14 @@ declare global {
 }
 
 // Updated categories with specific YouTube search queries and correct names
+// Reordered as requested: K-Pop -> Similar -> New -> Old -> Intro -> MV
 const CATEGORIES: PlaylistCategory[] = [
-  { id: 'rec', name: '入門推薦音樂', query: 'Best pop music starter playlist', description: 'Intro to Recommended Music', icon: '🎧' },
-  { id: 'old', name: '重溫舊愛', query: 'Throwback hits 2000s 2010s music', description: 'Relive Old Favorites', icon: '⏪' },
-  { id: 'mv', name: '專屬推薦音樂影片', query: 'Official Music Video hits', description: 'Recommended Music Videos', icon: '🎬' },
-  { id: 'kpop', name: 'K-Pop熱門歌曲', query: 'K-Pop top hits 2024', description: 'Latest K-Pop Hits', icon: '🕺' },
-  { id: 'sim_kpop', name: '風格近似 kpop', query: 'Songs similar to K-Pop style', description: 'Similar to K-Pop', icon: '✨' },
+  { id: 'kpop', name: '韓國流行音樂熱門歌曲', query: 'K-Pop top hits 2024 official audio', description: 'Latest K-Pop Hits', icon: '🕺' },
+  { id: 'sim_kpop', name: '風格近似 kpop', query: 'Songs similar to K-Pop style upbeat pop', description: 'Similar to K-Pop', icon: '✨' },
   { id: 'new', name: '最新發行', query: 'New music releases 2024 official audio', description: 'New Releases', icon: '🔥' },
+  { id: 'old', name: '重溫舊愛', query: 'Throwback hits 2000s 2010s music', description: 'Relive Old Favorites', icon: '⏪' },
+  { id: 'rec', name: '入門推薦音樂', query: 'Best pop music starter playlist', description: 'Intro to Recommended Music', icon: '🎧' },
+  { id: 'mv', name: '專屬推薦音樂影片', query: 'Official Music Video hits 4k', description: 'Recommended Music Videos', icon: '🎬' },
 ];
 
 const USER_EMAIL = "kaco0213@gmail.com";
