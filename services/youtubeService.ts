@@ -22,14 +22,13 @@ export const fetchPlaylistByContext = async (
     let nextPageToken = "";
     
     // Construct a weighted query: Base Query + (Random subset of Favorite Artists to influence results)
-    // We don't add ALL artists every time to avoid query length limits, just a mix.
     const artistString = favoriteArtists.length > 0 
       ? ` ${favoriteArtists.slice(0, 5).join(' ')}` 
       : "";
       
     const fullQuery = `${query}${artistString}`;
 
-    // Loop to fetch at least 3 pages (50 results per page is max) to satisfy > 100 songs requirement
+    // Loop to fetch at least 3 pages (50 results per page is max)
     // 50 * 3 = 150 songs
     let pagesFetched = 0;
     const maxPages = 3; 
@@ -43,7 +42,6 @@ export const fetchPlaylistByContext = async (
       const data = await response.json();
 
       if (!response.ok) {
-        // If quota exceeded or error, break loop but return what we have
         console.warn("YouTube API Warning:", data.error?.message);
         break;
       }
@@ -66,26 +64,22 @@ export const fetchPlaylistByContext = async (
       if (!nextPageToken) break;
     }
 
-    // Remove duplicates based on video ID
     const uniqueSongs = Array.from(new Map(allSongs.map(song => [song.id, song])).values());
     
     return uniqueSongs;
 
   } catch (error) {
     console.error("Error fetching from YouTube:", error);
-    // Return empty array or fallback instead of throwing to prevent app crash
     return mockFallbackData();
   }
 };
 
-// Helper to decode HTML entities
 function decodeHTMLEntities(text: string) {
   const textArea = document.createElement('textarea');
   textArea.innerHTML = text;
   return textArea.value;
 }
 
-// Fallback data
 const mockFallbackData = (): Song[] => [
     { id: '1', title: 'API KEY MISSING', artist: 'Please update services/youtubeService.ts', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/333/FFF?text=No+Key', year: '2024' },
     { id: '2', title: 'Feature Requires API', artist: 'YouTube Data API v3', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/333/FFF?text=Error', year: '2024' },

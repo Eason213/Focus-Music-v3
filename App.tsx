@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { SongList } from './components/SongList';
 import { MusicPlayer } from './components/MusicPlayer';
-import { ArtistSelector } from './components/ArtistSelector'; // Import
+import { ArtistSelector } from './components/ArtistSelector';
 import { fetchPlaylistByContext } from './services/youtubeService';
 import { PlaylistCategory, Song, LoadingState } from './types';
 
@@ -13,7 +13,7 @@ declare global {
   }
 }
 
-// Updated Categories per user request
+// Updated Categories
 const CATEGORIES: PlaylistCategory[] = [
   { id: 'quick_picks', name: '歌曲快選', query: 'Popular music mix', description: 'Quick Picks' },
   { id: 'kpop_hits', name: '韓國流行音樂熱門歌曲', query: 'K-Pop top hits 2024 official audio', description: 'K-Pop Hits' },
@@ -23,9 +23,6 @@ const CATEGORIES: PlaylistCategory[] = [
 ];
 
 const USER_EMAIL = "kaco0213@gmail.com";
-
-// Silent Audio for iOS Background keep-alive
-const SILENT_AUDIO_B64 = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEAAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
 
 export default function App() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(CATEGORIES[0].id);
@@ -61,18 +58,15 @@ export default function App() {
   const playerRef = useRef<any>(null);
   const progressInterval = useRef<any>(null);
   const handleSongEndRef = useRef<() => void>(() => {});
-  const silentAudioRef = useRef<HTMLAudioElement>(null);
 
   const currentCategory = CATEGORIES.find(c => c.id === selectedCategoryId) || CATEGORIES[0];
 
-  // Load favorite artists from local storage on mount to initialize queries
+  // Load favorite artists from local storage on mount
   useEffect(() => {
      const savedIds = localStorage.getItem('user_favorite_artists_ids');
      if (savedIds) {
          try {
-             // We trigger a reload implicitly via the ArtistSelector saving logic or when the user first interacts.
-             // But for the initial load of the default category, we might want to check storage.
-             // For now, let's just let the initial load happen.
+             // Logic handled in ArtistSelector or subsequent reloads
          } catch(e) {}
      }
   }, []);
@@ -81,9 +75,7 @@ export default function App() {
     setLoadingState(LoadingState.LOADING);
     setSongs([]);
     try {
-      // Use override if provided, otherwise use current state
       const artistsToUse = artistsOverride || favoriteArtistsNames;
-      
       const data = await fetchPlaylistByContext(query, isSearch ? [] : artistsToUse);
       setSongs(data);
       setLoadingState(LoadingState.SUCCESS);
@@ -99,7 +91,6 @@ export default function App() {
     }
   }, [favoriteArtistsNames]);
 
-  // Handle Category Selection
   const handleCategorySelect = (id: string) => {
     setSelectedCategoryId(id);
     setIsMobileMenuOpen(false); 
@@ -109,28 +100,23 @@ export default function App() {
     }
   };
 
-  // Handle Search
   const handleSearch = (query: string) => {
     setSelectedCategoryId(''); 
     setIsMobileMenuOpen(false); 
     loadSongs(query, true);
   };
 
-  // Handle Artist Save
   const handleArtistSave = (names: string[]) => {
       setFavoriteArtistsNames(names);
-      // Reload current category with new artist influence
       if (!isSearching) {
           loadSongs(currentCategory.query, false, names);
       }
   };
 
-  // Initial load
   useEffect(() => {
     loadSongs(currentCategory.query);
-  }, []); // Only once
+  }, []); 
 
-  // Update Document Title
   useEffect(() => {
     if (currentSong) {
       document.title = `${currentSong.title} • ${currentSong.artist}`;
@@ -143,7 +129,6 @@ export default function App() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isPlaying) {
-         // Force resume player if needed
          setTimeout(() => {
             if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
                playerRef.current.playVideo();
@@ -157,7 +142,6 @@ export default function App() {
     };
   }, [isPlaying]);
 
-  // Media Session
   const updateMediaSession = useCallback((song: Song | null) => {
     if (!('mediaSession' in navigator) || !song) return;
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -183,7 +167,6 @@ export default function App() {
       }
   }, [isPlaying]);
 
-  // YouTube Player
   const onPlayerStateChangeStatic = (event: any) => {
     if (event.data === 0) handleSongEndRef.current();
     if (event.data === 1) {
@@ -215,7 +198,12 @@ export default function App() {
           'origin': window.location.origin
         },
         events: {
-          'onReady': (event: any) => setIsPlayerReady(true),
+          'onReady': (event: any) => {
+              setIsPlayerReady(true);
+              // Ensure audio is enabled
+              event.target.unMute();
+              event.target.setVolume(100);
+          },
           'onStateChange': onPlayerStateChangeStatic,
           'onError': (e: any) => console.error("Player Error:", e)
         }
@@ -250,28 +238,24 @@ export default function App() {
     return () => clearInterval(progressInterval.current);
   }, [isPlaying]);
 
-  // Handlers
-  const ensureSilentAudio = () => {
-      // Play silent audio to hijack iOS background session
-      if (silentAudioRef.current && silentAudioRef.current.paused) {
-          silentAudioRef.current.play().catch(e => console.log("Silent audio failed", e));
-      }
-  };
-
   const handlePlaySong = (song: Song) => {
-    ensureSilentAudio();
     setCurrentSong(song);
     setIsPlaying(true);
     setCurrentTime(0);
     updateMediaSession(song);
+    
     if (playerRef.current && playerRef.current.loadVideoById) {
-      playerRef.current.loadVideoById(song.id);
-      playerRef.current.playVideo(); 
+      // Speed Optimization: 'small' quality loads faster for audio
+      playerRef.current.loadVideoById({
+          videoId: song.id,
+          startSeconds: 0,
+          suggestedQuality: 'small'
+      });
+      //playerRef.current.playVideo(); // loadVideoById usually autoplays, but safe to call
     }
   };
 
   const handleTogglePlay = () => {
-    ensureSilentAudio();
     if (!currentSong && songs.length > 0) {
       handlePlaySong(songs[0]);
       return;
@@ -286,7 +270,6 @@ export default function App() {
   };
 
   const handleNext = (isAuto: boolean = false) => {
-    ensureSilentAudio();
     if (!currentSong || songs.length === 0) return;
     let nextIndex = 0;
     const currentIndex = songs.findIndex(s => s.id === currentSong.id);
@@ -314,7 +297,6 @@ export default function App() {
   useEffect(() => { if(currentSong) updateMediaSession(currentSong); }, [currentSong, updateMediaSession]);
 
   const handlePrev = () => {
-    ensureSilentAudio();
     if (!currentSong || songs.length === 0) return;
     if (currentTime > 3) { playerRef.current?.seekTo(0); return; }
     let prevIndex = 0;
@@ -349,20 +331,17 @@ export default function App() {
     if (!touchStartRef.current || !touchCurrentRef.current) return;
     
     const distance = touchCurrentRef.current - touchStartRef.current;
-    const isLeftEdgeStart = touchStartRef.current < 50; // Started near left edge
+    const isLeftEdgeStart = touchStartRef.current < 50; 
     const SWIPE_THRESHOLD = 50;
 
-    // Swipe Right to Open (Only if started near edge)
     if (!isMobileMenuOpen && isLeftEdgeStart && distance > SWIPE_THRESHOLD) {
         setIsMobileMenuOpen(true);
     }
     
-    // Swipe Left to Close (Only if menu is open)
     if (isMobileMenuOpen && distance < -SWIPE_THRESHOLD) {
         setIsMobileMenuOpen(false);
     }
 
-    // Reset
     touchStartRef.current = null;
     touchCurrentRef.current = null;
   };
@@ -377,11 +356,6 @@ export default function App() {
       
       <div id="youtube-player" className="absolute top-0 left-0 w-px h-px opacity-[0.01] pointer-events-none z-0 overflow-hidden"></div>
       
-      {/* Silent Audio Loop for iOS Background Persistence */}
-      <audio ref={silentAudioRef} loop playsInline muted={false} controls={false} className="hidden">
-          <source src={SILENT_AUDIO_B64} type="audio/mpeg" />
-      </audio>
-
       <div className="fixed inset-0 z-0 pointer-events-none">
          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-900/20 rounded-full blur-[150px] animate-pulse"></div>
          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-900/20 rounded-full blur-[150px] animate-pulse"></div>
@@ -395,9 +369,7 @@ export default function App() {
 
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[60] md:hidden">
-            {/* Backdrop with fade */}
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsMobileMenuOpen(false)}></div>
-            {/* Menu with slide */}
             <div className="absolute inset-y-0 left-0 w-[85%] max-w-[320px] shadow-2xl animate-in slide-in-from-left duration-300">
                <Sidebar 
                   categories={CATEGORIES} 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Artist } from '../types';
 
-// Enhanced Artist Pool with Images and Recommendation Tags
 const AVAILABLE_ARTISTS: Artist[] = [
     // K-Pop
     { id: 'bts', name: 'BTS', category: 'kpop', tags: ['boygroup', 'dance', 'global'], imageUrl: 'https://images.unsplash.com/photo-1526478806334-5fd488fcaabc?auto=format&fit=crop&w=300&q=80' },
@@ -50,32 +49,22 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({ isOpen, onClose,
         );
     };
 
-    // ----------------------------------------------------------------------------------
-    // Recommendation Engine: Sort artists based on similarity to selected artists
-    // ----------------------------------------------------------------------------------
     const sortedArtists = useMemo(() => {
-        // 1. Gather tags from currently selected artists
         const selectedTags = new Set<string>();
         AVAILABLE_ARTISTS.filter(a => selectedIds.includes(a.id)).forEach(a => {
             a.tags?.forEach(t => selectedTags.add(t));
         });
 
-        // 2. Clone list to sort
         return [...AVAILABLE_ARTISTS].sort((a, b) => {
             const aSelected = selectedIds.includes(a.id);
             const bSelected = selectedIds.includes(b.id);
 
-            // Selected items always stay near top for visibility? 
-            // The user asked for "recommendation list", so arguably unselected but relevant should be high.
-            // Let's keep selected at top to show what I have, then relevant ones.
             if (aSelected && !bSelected) return -1;
             if (!aSelected && bSelected) return 1;
 
-            // Calculate similarity score
             const scoreA = a.tags?.filter(t => selectedTags.has(t)).length || 0;
             const scoreB = b.tags?.filter(t => selectedTags.has(t)).length || 0;
 
-            // Sort by score descending
             return scoreB - scoreA;
         });
     }, [selectedIds]);
@@ -118,22 +107,15 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({ isOpen, onClose,
                                             : 'hover:scale-105 hover:ring-2 hover:ring-white/20'
                                     }`}
                                 >
-                                    {/* Image */}
                                     <img 
                                         src={artist.imageUrl} 
                                         alt={artist.name} 
                                         className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 ${isSelected ? 'opacity-100 saturate-100' : 'opacity-70 grayscale-[0.5] group-hover:grayscale-0 group-hover:opacity-100'}`}
                                     />
-                                    
-                                    {/* Gradient Overlay */}
                                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90"></div>
-
-                                    {/* Selection Checkmark */}
                                     <div className={`absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center transition-all ${isSelected ? 'bg-pink-500 scale-100' : 'bg-white/20 scale-0 group-hover:scale-100'}`}>
                                         <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                     </div>
-
-                                    {/* Info */}
                                     <div className="absolute bottom-0 left-0 right-0 p-4 text-left">
                                         <h3 className={`font-bold text-lg leading-tight ${isSelected ? 'text-white' : 'text-zinc-200'}`}>{artist.name}</h3>
                                         <p className="text-xs text-zinc-400 mt-1 capitalize opacity-0 group-hover:opacity-100 transition-opacity">

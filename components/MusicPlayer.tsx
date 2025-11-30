@@ -32,8 +32,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 }) => {
   const [localProgress, setLocalProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  
-  // Expansion State
   const [isExpanded, setIsExpanded] = useState(false);
   
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -63,26 +61,23 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   };
 
   const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation(); // Prevent toggling expansion when clicking bar
+    e.stopPropagation();
     if (!progressBarRef.current || !duration) return;
     const rect = progressBarRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const width = rect.width;
     const percentage = Math.max(0, Math.min(1, x / width));
     const newTime = percentage * duration;
-    
     setLocalProgress(newTime);
     onSeek(newTime);
   };
 
-  // Expand / Collapse Handlers
   const handleExpand = () => setIsExpanded(true);
   const handleCollapse = (e: React.MouseEvent) => {
       e.stopPropagation();
       setIsExpanded(false);
   };
 
-  // Button handlers need stopPropagation to prevent expansion trigger on mini player
   const withStop = (fn: () => void) => (e: React.MouseEvent) => {
       e.stopPropagation();
       fn();
@@ -90,17 +85,12 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   return (
     <>
-      {/* 
-        ========================================================================
-        FULL SCREEN PLAYER OVERLAY
-        ========================================================================
-      */}
+      {/* FULL SCREEN PLAYER */}
       <div 
         className={`fixed inset-0 z-50 bg-black flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
             isExpanded ? 'translate-y-0' : 'translate-y-[100%]'
         }`}
       >
-        {/* Dynamic Blurry Background */}
         <div className="absolute inset-0 opacity-40 overflow-hidden pointer-events-none">
             {currentSong && (
                 <img 
@@ -112,15 +102,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             <div className="absolute inset-0 bg-black/40"></div>
         </div>
 
-        {/* Content Container */}
         <div className="relative z-10 flex flex-col h-full w-full max-w-lg mx-auto p-6 pt-safe-top pb-safe-bottom">
-            
-            {/* Top Bar: Collapse Button */}
             <div className="flex items-center justify-center h-12 mb-4 shrink-0 cursor-pointer" onClick={handleCollapse}>
                 <div className="w-12 h-1.5 bg-white/30 rounded-full hover:bg-white/50 transition-colors"></div>
             </div>
 
-            {/* Album Art Area (Flexible Space) */}
             <div className="flex-1 flex items-center justify-center w-full aspect-square max-h-[50vh] min-h-[300px] mb-8">
                 <div className="w-full h-full max-w-[90%] max-h-[90%] aspect-square rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden border border-white/10">
                     {currentSong ? (
@@ -133,19 +119,16 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                 </div>
             </div>
 
-            {/* Track Info */}
             <div className="flex justify-between items-end mb-8 px-2">
                 <div className="flex flex-col gap-1 overflow-hidden mr-4">
                     <h2 className="text-2xl font-bold text-white truncate leading-tight">{currentSong?.title || "Not Playing"}</h2>
                     <p className="text-lg text-zinc-400 font-medium truncate">{currentSong?.artist || "Select a song"}</p>
                 </div>
-                {/* Like Button Placeholder */}
                 <button className="p-2 text-zinc-400 hover:text-white">
                      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
                 </button>
             </div>
 
-            {/* Scrubber */}
             <div className="mb-10 px-2">
                 <div 
                     ref={progressBarRef}
@@ -167,7 +150,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden relative pointer-events-none">
                         <div className="h-full bg-white rounded-full" style={{ width: `${(localProgress / (duration || 1)) * 100}%` }}></div>
                     </div>
-                    {/* Big Thumb for Touch */}
                     <div 
                         className="absolute w-4 h-4 bg-white rounded-full shadow-md z-10 pointer-events-none transition-transform"
                         style={{ left: `calc(${(localProgress / (duration || 1)) * 100}% - 8px)` }}
@@ -179,8 +161,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                 </div>
             </div>
 
-            {/* Main Controls */}
-            <div className="flex items-center justify-between px-2 mb-10">
+            <div className="flex items-center justify-between px-2 mb-12">
                  <button onClick={withStop(onToggleShuffle)} className={`p-3 rounded-full ${isShuffle ? 'text-pink-500 bg-pink-500/10' : 'text-zinc-400'}`}>
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
                  </button>
@@ -209,8 +190,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                  </button>
             </div>
 
-            {/* Bottom Device/Options (Visual only) */}
-            <div className="flex justify-center mt-auto pb-16">
+            <div className="flex justify-center mt-auto pb-12">
                 <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-xs font-bold text-white/80">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
                     AirPlay or Bluetooth
@@ -219,24 +199,18 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         </div>
       </div>
 
-      {/* 
-        ========================================================================
-        MINI PLAYER (BOTTOM BAR)
-        ========================================================================
-      */}
+      {/* MINI PLAYER */}
       <div 
         className={`fixed bottom-6 left-0 right-0 z-40 px-4 md:px-8 flex justify-center transition-all duration-500 ${isExpanded ? 'opacity-0 pointer-events-none translate-y-10' : 'opacity-100 translate-y-0'}`}
-        onClick={handleExpand} // Clicking the bar expands it
+        onClick={handleExpand} 
       >
         <div className="w-full max-w-4xl bg-zinc-900/90 backdrop-blur-2xl saturate-150 border border-white/10 rounded-[2rem] p-3 md:p-4 shadow-2xl shadow-black/50 cursor-pointer hover:bg-zinc-800/90 transition-colors">
             
-            {/* Progress Bar (Mini) */}
             <div className="absolute top-0 left-6 right-6 h-[2px] bg-zinc-700/30 overflow-hidden">
                  <div className="h-full bg-white/50" style={{ width: `${(localProgress / (duration || 1)) * 100}%` }}></div>
             </div>
 
             <div className="flex items-center justify-between gap-3 mt-1">
-                {/* Track Info */}
                 <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
                     <div className={`w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden bg-zinc-800 shadow-lg flex-shrink-0 border border-white/5`}>
                         {currentSong ? (
@@ -253,7 +227,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     </div>
                 </div>
 
-                {/* Mini Controls */}
                 <div className="flex items-center gap-4 flex-shrink-0">
                     <button onClick={withStop(onTogglePlay)} className="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-black shadow-lg hover:scale-105 active:scale-90 transition-all">
                         {isPlaying ? (
