@@ -13,7 +13,15 @@ export interface PlaylistCategory {
   name: string;
   query: string; // Search query for YouTube
   description: string;
-  icon: string; 
+  // icon removed as requested
+}
+
+export interface Artist {
+  id: string;
+  name: string;
+  category: 'kpop' | 'mandopop';
+  imageUrl: string;
+  tags: string[];
 }
 
 export enum LoadingState {

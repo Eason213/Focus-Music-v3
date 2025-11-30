@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { SongList } from './components/SongList';
 import { MusicPlayer } from './components/MusicPlayer';
+import { ArtistSelector } from './components/ArtistSelector'; // Import
 import { fetchPlaylistByContext } from './services/youtubeService';
 import { PlaylistCategory, Song, LoadingState } from './types';
 
-// Declare global YT interface for IFrame API
 declare global {
   interface Window {
     YT: any;
@@ -13,15 +13,13 @@ declare global {
   }
 }
 
-// Updated categories with specific YouTube search queries and correct names
-// Reordered as requested: K-Pop -> Similar -> New -> Old -> Intro -> MV
+// Updated Categories per user request
 const CATEGORIES: PlaylistCategory[] = [
-  { id: 'kpop', name: '韓國流行音樂熱門歌曲', query: 'K-Pop top hits 2024 official audio', description: 'Latest K-Pop Hits', icon: '🕺' },
-  { id: 'sim_kpop', name: '風格近似 kpop', query: 'Songs similar to K-Pop style upbeat pop', description: 'Similar to K-Pop', icon: '✨' },
-  { id: 'new', name: '最新發行', query: 'New music releases 2024 official audio', description: 'New Releases', icon: '🔥' },
-  { id: 'old', name: '重溫舊愛', query: 'Throwback hits 2000s 2010s music', description: 'Relive Old Favorites', icon: '⏪' },
-  { id: 'rec', name: '入門推薦音樂', query: 'Best pop music starter playlist', description: 'Intro to Recommended Music', icon: '🎧' },
-  { id: 'mv', name: '專屬推薦音樂影片', query: 'Official Music Video hits 4k', description: 'Recommended Music Videos', icon: '🎬' },
+  { id: 'quick_picks', name: '歌曲快選', query: 'Popular music mix', description: 'Quick Picks' },
+  { id: 'kpop_hits', name: '韓國流行音樂熱門歌曲', query: 'K-Pop top hits 2024 official audio', description: 'K-Pop Hits' },
+  { id: 'mandopop_hits', name: '華語流行音樂熱門歌曲', query: 'Top Mandopop hits 2024 official audio', description: 'Mandopop Hits' },
+  { id: 'sim_kpop', name: '風格近似 kpop', query: 'Upbeat pop music similar to K-Pop', description: 'Similar to K-Pop' },
+  { id: 'new_release', name: '最新發行', query: 'New music releases 2024 official audio', description: 'New Releases' },
 ];
 
 const USER_EMAIL = "kaco0213@gmail.com";
@@ -37,6 +35,10 @@ export default function App() {
 
   // Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // Artist Selector State
+  const [isArtistSelectorOpen, setIsArtistSelectorOpen] = useState(false);
+  const [favoriteArtistsNames, setFavoriteArtistsNames] = useState<string[]>([]);
 
   // Playback State
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -45,25 +47,40 @@ export default function App() {
   const [duration, setDuration] = useState(0);
   
   // Player Logic State
-  const [repeatMode, setRepeatMode] = useState<0 | 1 | 2>(0); // 0: Off, 1: All, 2: One
+  const [repeatMode, setRepeatMode] = useState<0 | 1 | 2>(0); 
   const [isShuffle, setIsShuffle] = useState(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
 
-  // YouTube Player Ref
+  // Swipe Gesture Refs
+  const touchStartRef = useRef<number | null>(null);
+  const touchCurrentRef = useRef<number | null>(null);
+
   const playerRef = useRef<any>(null);
-  // Interval Ref for polling progress
   const progressInterval = useRef<any>(null);
-  
-  // Refs to hold latest state/functions for the stable YT event listener
   const handleSongEndRef = useRef<() => void>(() => {});
 
   const currentCategory = CATEGORIES.find(c => c.id === selectedCategoryId) || CATEGORIES[0];
 
-  const loadSongs = useCallback(async (query: string, isSearch: boolean = false) => {
+  // Load favorite artists from local storage on mount to initialize queries
+  useEffect(() => {
+     const savedIds = localStorage.getItem('user_favorite_artists_ids');
+     if (savedIds) {
+         try {
+             // We trigger a reload implicitly via the ArtistSelector saving logic or when the user first interacts.
+             // But for the initial load of the default category, we might want to check storage.
+             // For now, let's just let the initial load happen.
+         } catch(e) {}
+     }
+  }, []);
+
+  const loadSongs = useCallback(async (query: string, isSearch: boolean = false, artistsOverride?: string[]) => {
     setLoadingState(LoadingState.LOADING);
     setSongs([]);
     try {
-      const data = await fetchPlaylistByContext(query);
+      // Use override if provided, otherwise use current state
+      const artistsToUse = artistsOverride || favoriteArtistsNames;
+      
+      const data = await fetchPlaylistByContext(query, isSearch ? [] : artistsToUse);
       setSongs(data);
       setLoadingState(LoadingState.SUCCESS);
       if (isSearch) {
@@ -76,12 +93,12 @@ export default function App() {
       console.error(error);
       setLoadingState(LoadingState.ERROR);
     }
-  }, []);
+  }, [favoriteArtistsNames]);
 
   // Handle Category Selection
   const handleCategorySelect = (id: string) => {
     setSelectedCategoryId(id);
-    setIsMobileMenuOpen(false); // Close mobile menu on select
+    setIsMobileMenuOpen(false); 
     const cat = CATEGORIES.find(c => c.id === id);
     if (cat) {
       loadSongs(cat.query);
@@ -91,16 +108,25 @@ export default function App() {
   // Handle Search
   const handleSearch = (query: string) => {
     setSelectedCategoryId(''); 
-    setIsMobileMenuOpen(false); // Close mobile menu on search
+    setIsMobileMenuOpen(false); 
     loadSongs(query, true);
+  };
+
+  // Handle Artist Save
+  const handleArtistSave = (names: string[]) => {
+      setFavoriteArtistsNames(names);
+      // Reload current category with new artist influence
+      if (!isSearching) {
+          loadSongs(currentCategory.query, false, names);
+      }
   };
 
   // Initial load
   useEffect(() => {
     loadSongs(currentCategory.query);
-  }, []);
+  }, []); // Only once
 
-  // Update Document Title for Lock Screen Info
+  // Update Document Title
   useEffect(() => {
     if (currentSong) {
       document.title = `${currentSong.title} • ${currentSong.artist}`;
@@ -109,16 +135,10 @@ export default function App() {
     }
   }, [currentSong]);
 
-  // ==================== IOS PWA BACKGROUND PLAYBACK FIX ====================
-  // 監聽 visibilitychange 事件：當使用者回到桌面時，強制恢復播放
+  // iOS Background Fix
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // 狀態：'hidden' 表示 App 進入背景 (回到桌面或鎖定螢幕)
       if (document.visibilityState === 'hidden' && isPlaying) {
-         console.log("App went background, forcing playback...");
-         
-         // iOS Safari 會在進入背景時自動暫停，我們設置一個微小的延遲來 "反擊" 這個行為
-         // 強制再次呼叫 playVideo 以保持 Audio Session 活躍
          setTimeout(() => {
             if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
                playerRef.current.playVideo();
@@ -126,72 +146,46 @@ export default function App() {
          }, 100);
       }
     };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isPlaying]);
 
-  // ==================== MEDIA SESSION API (iOS Control Center) ====================
+  // Media Session
   const updateMediaSession = useCallback((song: Song | null) => {
     if (!('mediaSession' in navigator) || !song) return;
-
     navigator.mediaSession.metadata = new MediaMetadata({
       title: song.title,
       artist: song.artist,
       album: song.album,
-      artwork: [
-        { src: song.thumbnail, sizes: '512x512', type: 'image/jpeg' }
-      ]
+      artwork: [{ src: song.thumbnail, sizes: '512x512', type: 'image/jpeg' }]
     });
-
-    // Handlers
-    navigator.mediaSession.setActionHandler('play', () => {
-        handleTogglePlay();
-    });
-    navigator.mediaSession.setActionHandler('pause', () => {
-        handleTogglePlay();
-    });
-    navigator.mediaSession.setActionHandler('previoustrack', () => {
-        handlePrev();
-    });
-    navigator.mediaSession.setActionHandler('nexttrack', () => {
-        handleNext(false);
-    });
+    navigator.mediaSession.setActionHandler('play', () => handleTogglePlay());
+    navigator.mediaSession.setActionHandler('pause', () => handleTogglePlay());
+    navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
+    navigator.mediaSession.setActionHandler('nexttrack', () => handleNext(false));
     navigator.mediaSession.setActionHandler('seekto', (details) => {
         if (details.seekTime && details.fastSeek === undefined) {
              handleSeek(details.seekTime);
         }
     });
-  }, [songs, isShuffle, repeatMode]); // Deps needed for handlers to access latest state via closures if not refactored, but here we invoke functions that use refs or fresh state.
+  }, [songs, isShuffle, repeatMode]);
 
-  // Update playback state in Media Session
   useEffect(() => {
       if ('mediaSession' in navigator) {
           navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
       }
   }, [isPlaying]);
 
-
-  // ==================== YOUTUBE PLAYER INIT ====================
-  
-  // Static Event Handler for YT Player that delegates to the Ref
+  // YouTube Player
   const onPlayerStateChangeStatic = (event: any) => {
-    if (event.data === 0) { // ENDED
-       handleSongEndRef.current();
-    }
-    if (event.data === 1) { // PLAYING
+    if (event.data === 0) handleSongEndRef.current();
+    if (event.data === 1) {
        setIsPlaying(true);
-       if (event.target && event.target.getDuration) {
-          setDuration(event.target.getDuration());
-       }
+       if (event.target && event.target.getDuration) setDuration(event.target.getDuration());
     }
-    if (event.data === 2) { // PAUSED
-       // 如果不是我們主動暫停 (例如是系統自動暫停)，且我們希望它是播放狀態，這裡可以做檢查
-       // 但在 React state 中我們通常信任播放器的回調
-       setIsPlaying(false);
-    }
+    if (event.data === 2) setIsPlaying(false);
   };
 
   useEffect(() => {
@@ -207,7 +201,7 @@ export default function App() {
         height: '100%',
         width: '100%',
         playerVars: {
-          'playsinline': 1, // Crucial for iOS
+          'playsinline': 1,
           'controls': 0,
           'autoplay': 0, 
           'disablekb': 1,
@@ -216,9 +210,7 @@ export default function App() {
           'origin': window.location.origin
         },
         events: {
-          'onReady': (event: any) => {
-             setIsPlayerReady(true);
-          },
+          'onReady': (event: any) => setIsPlayerReady(true),
           'onStateChange': onPlayerStateChangeStatic,
           'onError': (e: any) => console.error("Player Error:", e)
         }
@@ -230,7 +222,6 @@ export default function App() {
     }
   }, []);
 
-  // Poll for Progress
   useEffect(() => {
     if (isPlaying) {
       progressInterval.current = setInterval(() => {
@@ -239,8 +230,6 @@ export default function App() {
           const dur = playerRef.current.getDuration();
           setCurrentTime(curr);
           if (dur > 0) setDuration(dur);
-          
-          // Update Media Session Position State (Experimental but good for lock screen slider)
           if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
              navigator.mediaSession.setPositionState({
                  duration: dur,
@@ -256,21 +245,15 @@ export default function App() {
     return () => clearInterval(progressInterval.current);
   }, [isPlaying]);
 
-
-  // ==================== CONTROL HANDLERS ====================
-
+  // Handlers
   const handlePlaySong = (song: Song) => {
     setCurrentSong(song);
     setIsPlaying(true);
     setCurrentTime(0);
-    
-    // Update iOS Media Center
     updateMediaSession(song);
-
-    // CRITICAL for iOS: Call player methods synchronously in the event handler if possible.
     if (playerRef.current && playerRef.current.loadVideoById) {
       playerRef.current.loadVideoById(song.id);
-      playerRef.current.playVideo(); // Force play for iOS
+      playerRef.current.playVideo(); 
     }
   };
 
@@ -279,7 +262,6 @@ export default function App() {
       handlePlaySong(songs[0]);
       return;
     }
-
     if (isPlaying) {
       playerRef.current?.pauseVideo();
       setIsPlaying(false); 
@@ -291,73 +273,38 @@ export default function App() {
 
   const handleNext = (isAuto: boolean = false) => {
     if (!currentSong || songs.length === 0) return;
-    
     let nextIndex = 0;
     const currentIndex = songs.findIndex(s => s.id === currentSong.id);
 
     if (isShuffle) {
         if (songs.length > 1) {
-            do {
-                nextIndex = Math.floor(Math.random() * songs.length);
-            } while (nextIndex === currentIndex);
+            do { nextIndex = Math.floor(Math.random() * songs.length); } while (nextIndex === currentIndex);
         }
     } else {
         if (currentIndex === songs.length - 1) {
-            if (repeatMode === 0 && isAuto) {
-                setIsPlaying(false);
-                return; 
-            }
+            if (repeatMode === 0 && isAuto) { setIsPlaying(false); return; }
             nextIndex = 0; 
-        } else {
-            nextIndex = currentIndex + 1;
-        }
+        } else { nextIndex = currentIndex + 1; }
     }
-
     handlePlaySong(songs[nextIndex]);
   };
 
   const handleSongEnd = () => {
       if (repeatMode === 2) {
-          // Single Loop
-          if (playerRef.current) {
-            playerRef.current.seekTo(0);
-            playerRef.current.playVideo();
-          }
-      } else {
-          // Play Next
-          handleNext(true); 
-      }
+          if (playerRef.current) { playerRef.current.seekTo(0); playerRef.current.playVideo(); }
+      } else { handleNext(true); }
   };
 
-  // Update the ref whenever handleSongEnd changes
-  useEffect(() => {
-    handleSongEndRef.current = handleSongEnd;
-  });
-
-  // Re-attach handlers to media session when dependencies change (like song list order for next/prev)
-  useEffect(() => {
-    if(currentSong) {
-        updateMediaSession(currentSong);
-    }
-  }, [currentSong, updateMediaSession]);
+  useEffect(() => { handleSongEndRef.current = handleSongEnd; });
+  useEffect(() => { if(currentSong) updateMediaSession(currentSong); }, [currentSong, updateMediaSession]);
 
   const handlePrev = () => {
     if (!currentSong || songs.length === 0) return;
-    
-    if (currentTime > 3) {
-        playerRef.current?.seekTo(0);
-        return;
-    }
-
+    if (currentTime > 3) { playerRef.current?.seekTo(0); return; }
     let prevIndex = 0;
     const currentIndex = songs.findIndex(s => s.id === currentSong.id);
-
-    if (isShuffle) {
-         prevIndex = (currentIndex - 1 + songs.length) % songs.length;
-    } else {
-        prevIndex = (currentIndex - 1 + songs.length) % songs.length;
-    }
-
+    if (isShuffle) { prevIndex = (currentIndex - 1 + songs.length) % songs.length; } 
+    else { prevIndex = (currentIndex - 1 + songs.length) % songs.length; }
     handlePlaySong(songs[prevIndex]);
   };
 
@@ -365,44 +312,71 @@ export default function App() {
     if (playerRef.current) {
       playerRef.current.seekTo(time, true);
       setCurrentTime(time);
-      if (!isPlaying) {
-          playerRef.current.playVideo();
-          setIsPlaying(true);
-      }
+      if (!isPlaying) { playerRef.current.playVideo(); setIsPlaying(true); }
     }
   };
 
   const toggleRepeat = () => setRepeatMode((prev) => (prev + 1) % 3 as 0 | 1 | 2);
   const toggleShuffle = () => setIsShuffle(!isShuffle);
 
-  return (
-    <div className="flex h-screen w-screen overflow-hidden bg-black text-white font-sans selection:bg-pink-500/30 selection:text-white">
-      
-      {/* 
-         iOS Optimization: 
-         Keep player technically 'visible' (1x1 pixel) but invisible to user. 
-         Completely off-screen (top: -1000px) causes iOS Safari to pause audio in background.
-      */}
-      <div 
-        id="youtube-player" 
-        className="absolute top-0 left-0 w-px h-px opacity-[0.01] pointer-events-none z-0 overflow-hidden"
-      ></div>
+  // Gesture Handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = e.touches[0].clientX;
+    touchCurrentRef.current = e.touches[0].clientX;
+  };
 
-      {/* Background Ambient Glow */}
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchCurrentRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartRef.current || !touchCurrentRef.current) return;
+    
+    const distance = touchCurrentRef.current - touchStartRef.current;
+    const isLeftEdgeStart = touchStartRef.current < 50; // Started near left edge
+    const SWIPE_THRESHOLD = 50;
+
+    // Swipe Right to Open (Only if started near edge)
+    if (!isMobileMenuOpen && isLeftEdgeStart && distance > SWIPE_THRESHOLD) {
+        setIsMobileMenuOpen(true);
+    }
+    
+    // Swipe Left to Close (Only if menu is open)
+    if (isMobileMenuOpen && distance < -SWIPE_THRESHOLD) {
+        setIsMobileMenuOpen(false);
+    }
+
+    // Reset
+    touchStartRef.current = null;
+    touchCurrentRef.current = null;
+  };
+
+  return (
+    <div 
+        className="flex h-screen w-screen overflow-hidden bg-black text-white font-sans selection:bg-pink-500/30 selection:text-white touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+    >
+      
+      <div id="youtube-player" className="absolute top-0 left-0 w-px h-px opacity-[0.01] pointer-events-none z-0 overflow-hidden"></div>
+
       <div className="fixed inset-0 z-0 pointer-events-none">
          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-900/20 rounded-full blur-[150px] animate-pulse"></div>
          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-900/20 rounded-full blur-[150px] animate-pulse"></div>
       </div>
 
-      {/* Mobile Menu Overlay */}
+      <ArtistSelector 
+        isOpen={isArtistSelectorOpen}
+        onClose={() => setIsArtistSelectorOpen(false)}
+        onSave={handleArtistSave}
+      />
+
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[60] md:hidden">
-            {/* Backdrop */}
-            <div 
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
-              onClick={() => setIsMobileMenuOpen(false)}
-            ></div>
-            {/* Slide-in Menu */}
+            {/* Backdrop with fade */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsMobileMenuOpen(false)}></div>
+            {/* Menu with slide */}
             <div className="absolute inset-y-0 left-0 w-[85%] max-w-[320px] shadow-2xl animate-in slide-in-from-left duration-300">
                <Sidebar 
                   categories={CATEGORIES} 
@@ -411,12 +385,12 @@ export default function App() {
                   userEmail={USER_EMAIL}
                   onSearch={handleSearch}
                   onClose={() => setIsMobileMenuOpen(false)}
+                  onOpenArtistSettings={() => { setIsMobileMenuOpen(false); setIsArtistSelectorOpen(true); }}
                 />
             </div>
         </div>
       )}
 
-      {/* Desktop Sidebar */}
       <div className="hidden md:flex h-full z-20 relative">
         <Sidebar 
           categories={CATEGORIES} 
@@ -424,34 +398,20 @@ export default function App() {
           onSelect={handleCategorySelect}
           userEmail={USER_EMAIL}
           onSearch={handleSearch}
+          onOpenArtistSettings={() => setIsArtistSelectorOpen(true)}
         />
       </div>
 
       <main className="flex-1 h-full overflow-hidden flex flex-col relative z-10">
         
-        {/* Mobile Header */}
         <div className="md:hidden bg-zinc-900/80 backdrop-blur-xl p-4 border-b border-white/5 flex items-center gap-4 sticky top-0 z-30 pt-safe-top">
-           {/* Hamburger Menu Button */}
-           <button 
-             onClick={() => setIsMobileMenuOpen(true)}
-             className="p-2 -ml-2 text-white hover:bg-white/10 rounded-full transition-colors"
-             aria-label="Open Menu"
-           >
-             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-             </svg>
+           <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-white hover:bg-white/10 rounded-full transition-colors">
+             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
            </button>
-           
            <span className="font-bold text-white text-lg tracking-tight truncate flex-1">Music</span>
-           
-           {/* Quick Category Select (Optional on mobile since we have sidebar now, but kept for convenience) */}
-           <select 
-              className="bg-zinc-800/50 text-sm p-2 rounded-lg text-white border-none outline-none backdrop-blur-md max-w-[150px]"
-              value={selectedCategoryId}
-              onChange={(e) => handleCategorySelect(e.target.value)}
-           >
-             {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-           </select>
+           <button onClick={() => setIsArtistSelectorOpen(true)} className="p-2 text-zinc-400 hover:text-white">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+           </button>
         </div>
 
         <SongList 

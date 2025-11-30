@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlaylistCategory } from '../types';
 
 interface SidebarProps {
@@ -7,26 +7,24 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   userEmail: string;
   onSearch: (query: string) => void;
-  onClose?: () => void; // Optional prop for closing sidebar on mobile
+  onClose?: () => void;
+  onOpenArtistSettings: () => void;
 }
 
-// Predefined hot keywords for auto-recommendation
 const POPULAR_KEYWORDS = [
-  "NewJeans", "BTS", "Blackpink", "TWICE", "IVE", "LE SSERAFIM", 
+  "NewJeans", "BTS", "Blackpink", "Jay Chou", "Eric Chou", "GEM", 
   "Taylor Swift", "The Weeknd", "Justin Bieber", "Ariana Grande",
-  "Lo-Fi Hip Hop", "Jazz Vibes", "Piano Focus", "Workout Mix",
-  "2000s R&B", "Rock Classics", "Acoustic Pop"
+  "Lo-Fi Hip Hop", "Jazz Vibes", "Piano Focus"
 ];
 
 const MAX_HISTORY_ITEMS = 5;
 
-export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSelect, userEmail, onSearch, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSelect, userEmail, onSearch, onClose, onOpenArtistSettings }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
   
-  // Load history from local storage on mount
   useEffect(() => {
     const saved = localStorage.getItem('music_dashboard_search_history');
     if (saved) {
@@ -38,7 +36,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
     }
   }, []);
 
-  // Filter suggestions when query changes
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredSuggestions([]);
@@ -47,13 +44,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
     const lowerQuery = searchQuery.toLowerCase();
     const matches = POPULAR_KEYWORDS.filter(k => 
       k.toLowerCase().includes(lowerQuery)
-    ).slice(0, 5); // Limit to 5 suggestions
+    ).slice(0, 5); 
     setFilteredSuggestions(matches);
   }, [searchQuery]);
 
   const saveToHistory = (query: string) => {
     if (!query.trim()) return;
-    
     const newHistory = [query, ...searchHistory.filter(h => h !== query)].slice(0, MAX_HISTORY_ITEMS);
     setSearchHistory(newHistory);
     localStorage.setItem('music_dashboard_search_history', JSON.stringify(newHistory));
@@ -94,7 +90,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
             <span className="text-2xl font-bold tracking-tight text-white">Music</span>
           </div>
           
-          {/* Close Button for Mobile */}
           {onClose && (
             <button 
               onClick={onClose}
@@ -107,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
           )}
         </div>
 
-        {/* Search Bar Container */}
+        {/* Search Bar */}
         <div className="mb-8 px-1 relative z-50">
           <form onSubmit={handleSearchSubmit} className="relative group">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -118,19 +113,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
             <input
               type="text"
               className="block w-full pl-10 pr-3 py-2 border border-white/10 rounded-lg leading-5 bg-zinc-800 text-zinc-300 placeholder-zinc-500 focus:outline-none focus:bg-zinc-700 focus:text-white focus:border-white/30 sm:text-sm transition-all shadow-inner"
-              placeholder="Search songs..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setIsFocused(true)}
-              onBlur={() => setTimeout(() => setIsFocused(false), 200)} // Delay to allow click on dropdown
+              onBlur={() => setTimeout(() => setIsFocused(false), 200)} 
             />
           </form>
 
-          {/* Search Suggestions & History Dropdown */}
           {isFocused && (searchHistory.length > 0 || filteredSuggestions.length > 0) && (
              <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-800/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                
-                {/* Suggestions Section */}
                 {filteredSuggestions.length > 0 && (
                   <div className="py-2">
                     <div className="px-3 py-1 text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Suggestions</div>
@@ -138,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
                       <div 
                         key={`sug-${idx}`}
                         className="px-4 py-2 hover:bg-white/10 cursor-pointer flex items-center gap-3 text-sm text-zinc-200"
-                        onMouseDown={() => executeSearch(item)} // Use onMouseDown to trigger before input blur
+                        onMouseDown={() => executeSearch(item)} 
                       >
                          <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                          {item}
@@ -147,8 +139,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
                     {searchHistory.length > 0 && <div className="h-px bg-white/5 mx-2 my-1"></div>}
                   </div>
                 )}
-
-                {/* History Section */}
                 {searchHistory.length > 0 && (
                   <div className="py-2">
                      <div className="px-3 py-1 text-[10px] uppercase font-bold text-zinc-500 tracking-wider flex justify-between">
@@ -185,24 +175,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
         {/* Navigation */}
         <nav className="space-y-1 flex-1 overflow-y-auto no-scrollbar">
           <p className="px-4 text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Your Library</p>
-          {categories.map((cat) => (
+          {categories.map((cat, index) => (
             <button
               key={cat.id}
               onClick={() => onSelect(cat.id)}
-              className={`w-full text-left px-4 py-3.5 rounded-xl text-[15px] font-semibold transition-all duration-300 flex items-center gap-4 group ${
+              className={`w-full text-left px-4 py-4 rounded-xl text-[15px] font-semibold transition-all duration-300 flex items-center gap-4 group border border-transparent ${
                 selectedId === cat.id
-                  ? 'bg-white/10 text-white shadow-lg backdrop-blur-sm'
+                  ? 'bg-white/10 text-white shadow-lg backdrop-blur-sm border-white/5'
                   : 'text-zinc-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <span className={`text-xl transition-transform duration-300 ${selectedId === cat.id ? 'scale-110' : 'group-hover:scale-110'}`}>{cat.icon}</span>
+              {/* Index indicator removed as requested */}
               {cat.name}
-              {selectedId === cat.id && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.8)]"></div>
-              )}
             </button>
           ))}
         </nav>
+
+        {/* Artist Customization Button */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+            <button 
+                onClick={onOpenArtistSettings}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-900/50 to-purple-900/50 hover:from-indigo-800 hover:to-purple-800 border border-indigo-500/20 text-indigo-100 transition-all group"
+            >
+                <div className="p-1.5 bg-indigo-500/20 rounded-lg group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                </div>
+                <div className="text-left">
+                    <div className="text-sm font-bold">Preferences</div>
+                    <div className="text-[10px] text-indigo-300 opacity-80">Customize Artists</div>
+                </div>
+            </button>
+        </div>
+
       </div>
     </div>
   );
