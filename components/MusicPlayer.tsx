@@ -210,7 +210,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             </div>
 
             {/* Bottom Device/Options (Visual only) */}
-            <div className="flex justify-center mt-auto pb-12">
+            <div className="flex justify-center mt-auto pb-16">
                 <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-xs font-bold text-white/80">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
                     AirPlay or Bluetooth
@@ -225,7 +225,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         ========================================================================
       */}
       <div 
-        className={`absolute bottom-6 left-0 right-0 z-40 px-4 md:px-8 flex justify-center transition-all duration-500 ${isExpanded ? 'opacity-0 pointer-events-none translate-y-10' : 'opacity-100 translate-y-0'}`}
+        className={`fixed bottom-6 left-0 right-0 z-40 px-4 md:px-8 flex justify-center transition-all duration-500 ${isExpanded ? 'opacity-0 pointer-events-none translate-y-10' : 'opacity-100 translate-y-0'}`}
         onClick={handleExpand} // Clicking the bar expands it
       >
         <div className="w-full max-w-4xl bg-zinc-900/90 backdrop-blur-2xl saturate-150 border border-white/10 rounded-[2rem] p-3 md:p-4 shadow-2xl shadow-black/50 cursor-pointer hover:bg-zinc-800/90 transition-colors">

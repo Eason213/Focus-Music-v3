@@ -29,8 +29,8 @@ export const fetchPlaylistByContext = async (
       
     const fullQuery = `${query}${artistString}`;
 
-    // Loop to fetch at least 2 pages (50 results per page is max) to satisfy > 100 songs requirement
-    // Safety break at 3 pages (~150 items) to save quota
+    // Loop to fetch at least 3 pages (50 results per page is max) to satisfy > 100 songs requirement
+    // 50 * 3 = 150 songs
     let pagesFetched = 0;
     const maxPages = 3; 
 

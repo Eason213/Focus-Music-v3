@@ -185,7 +185,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ categories, selectedId, onSele
                   : 'text-zinc-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              {/* Index indicator removed as requested */}
               {cat.name}
             </button>
           ))}

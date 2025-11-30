@@ -24,6 +24,9 @@ const CATEGORIES: PlaylistCategory[] = [
 
 const USER_EMAIL = "kaco0213@gmail.com";
 
+// Silent Audio for iOS Background keep-alive
+const SILENT_AUDIO_B64 = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEAAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//OEAAAAAAAAAAAAAAAAAAAAAAAAMGluZm8AAAAPAAAABAAAASH////////////////////////////////////////////AAAAAtTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
+
 export default function App() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(CATEGORIES[0].id);
   const [songs, setSongs] = useState<Song[]>([]);
@@ -58,6 +61,7 @@ export default function App() {
   const playerRef = useRef<any>(null);
   const progressInterval = useRef<any>(null);
   const handleSongEndRef = useRef<() => void>(() => {});
+  const silentAudioRef = useRef<HTMLAudioElement>(null);
 
   const currentCategory = CATEGORIES.find(c => c.id === selectedCategoryId) || CATEGORIES[0];
 
@@ -139,6 +143,7 @@ export default function App() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && isPlaying) {
+         // Force resume player if needed
          setTimeout(() => {
             if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
                playerRef.current.playVideo();
@@ -246,7 +251,15 @@ export default function App() {
   }, [isPlaying]);
 
   // Handlers
+  const ensureSilentAudio = () => {
+      // Play silent audio to hijack iOS background session
+      if (silentAudioRef.current && silentAudioRef.current.paused) {
+          silentAudioRef.current.play().catch(e => console.log("Silent audio failed", e));
+      }
+  };
+
   const handlePlaySong = (song: Song) => {
+    ensureSilentAudio();
     setCurrentSong(song);
     setIsPlaying(true);
     setCurrentTime(0);
@@ -258,6 +271,7 @@ export default function App() {
   };
 
   const handleTogglePlay = () => {
+    ensureSilentAudio();
     if (!currentSong && songs.length > 0) {
       handlePlaySong(songs[0]);
       return;
@@ -272,6 +286,7 @@ export default function App() {
   };
 
   const handleNext = (isAuto: boolean = false) => {
+    ensureSilentAudio();
     if (!currentSong || songs.length === 0) return;
     let nextIndex = 0;
     const currentIndex = songs.findIndex(s => s.id === currentSong.id);
@@ -299,6 +314,7 @@ export default function App() {
   useEffect(() => { if(currentSong) updateMediaSession(currentSong); }, [currentSong, updateMediaSession]);
 
   const handlePrev = () => {
+    ensureSilentAudio();
     if (!currentSong || songs.length === 0) return;
     if (currentTime > 3) { playerRef.current?.seekTo(0); return; }
     let prevIndex = 0;
@@ -360,6 +376,11 @@ export default function App() {
     >
       
       <div id="youtube-player" className="absolute top-0 left-0 w-px h-px opacity-[0.01] pointer-events-none z-0 overflow-hidden"></div>
+      
+      {/* Silent Audio Loop for iOS Background Persistence */}
+      <audio ref={silentAudioRef} loop playsInline muted={false} controls={false} className="hidden">
+          <source src={SILENT_AUDIO_B64} type="audio/mpeg" />
+      </audio>
 
       <div className="fixed inset-0 z-0 pointer-events-none">
          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-900/20 rounded-full blur-[150px] animate-pulse"></div>
