@@ -84,6 +84,7 @@ export const fetchPlaylistByContext = async (
       const pageTokenParam = nextPageToken ? `&pageToken=${nextPageToken}` : "";
       
       // Cache Buster: _cb=${Date.now()} ensures the browser never caches this request
+      // NOTE: Removed videoDuration=short to allow songs > 4 mins. We filter in code instead.
       const searchUrl = `${BASE_URL}/search?part=id&maxResults=50&q=${encodeURIComponent(finalQuery)}&type=video&videoCategoryId=10&videoEmbeddable=true&order=${randomOrder}&key=${YOUTUBE_API_KEY}${pageTokenParam}&_cb=${Date.now()}`;
       
       const searchRes = await fetch(searchUrl);
@@ -118,8 +119,10 @@ export const fetchPlaylistByContext = async (
                     };
                 })
                 .filter((song: any) => {
-                    // STRICT Filtering: > 2 mins (120s) AND < 4 mins (240s)
-                    return song.durationVal > 120 && song.durationVal < 240;
+                    // FILTER UPDATE: 
+                    // Remove 2 min limit (Set minimal > 60s to avoid Shorts/Intros).
+                    // Set Upper limit < 5 mins (300s).
+                    return song.durationVal > 60 && song.durationVal < 300;
                 });
 
               allSongs = [...allSongs, ...validSongs];
