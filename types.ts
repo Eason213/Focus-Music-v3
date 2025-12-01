@@ -1,4 +1,3 @@
-
 export interface Song {
   id: string; // YouTube Video ID
   title: string;
@@ -20,6 +19,7 @@ export interface Artist {
   id: string;
   name: string;
   category: 'kpop' | 'mandopop';
+  imageUrl: string;
   tags: string[];
 }
 
