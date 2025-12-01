@@ -48,34 +48,47 @@ export const fetchPlaylistByContext = async (
     // ---------------------------------------------------------
     let finalQuery = query;
 
-    // A. Gender Enforcement for specific categories
-    const FEMALE_ONLY_CATEGORIES = ['quick_picks', 'kpop_hits', 'sim_kpop'];
+    // A. Gender Enforcement
+    // 規則：只有「華語流行音樂熱門歌曲 (mandopop_hits)」與「搜尋 (search)」不侷限女歌手。
+    // 其他項目：歌曲快選、韓國流行、近似Kpop、最新發行 皆需要女歌手/女團體限制。
+    const FEMALE_ONLY_CATEGORIES = ['quick_picks', 'kpop_hits', 'sim_kpop', 'new_release'];
+    
+    // Check if current category is in the restricted list
     if (FEMALE_ONLY_CATEGORIES.includes(categoryId)) {
         finalQuery += ' (female OR "girl group" OR diva)';
     }
 
-    // B. Artist Weighting
-    // Pick a random subset of 3 artists to append to query to avoid query limit
+    // B. Artist Weighting & Dynamic Recommendation
+    // Pick a random subset of artists to vary the results on refresh
     if (favoriteArtists.length > 0) {
         const shuffled = favoriteArtists.sort(() => 0.5 - Math.random());
-        const selectedSubset = shuffled.slice(0, 3);
+        // Use up to 4 artists to influence the query
+        const selectedSubset = shuffled.slice(0, 4);
         const artistQuery = selectedSubset.map(a => `"${a}"`).join(' | ');
         finalQuery += ` (${artistQuery})`;
     }
 
+    // C. Randomize Order parameter to ensure "Refresh" works
+    // We rotate between 'relevance', 'date', and 'viewCount' to get different seeds
+    // This satisfies the requirement: "每次重新整理或開啟軟體時必須重新截取Youtube最新資料"
+    const orderOptions = ['relevance', 'date', 'viewCount', 'relevance'];
+    const randomOrder = orderOptions[Math.floor(Math.random() * orderOptions.length)];
+
     // ---------------------------------------------------------
     // 2. Fetch Loop (Search -> Get IDs -> Get Details -> Filter)
     // ---------------------------------------------------------
-    // We need > 100 songs. Since strict filtering drops many songs,
-    // we fetch more pages.
+    // Goal: Get > 50 valid songs after strict filtering.
     let pagesFetched = 0;
-    const maxPages = 6; // Increased pages to account for filtering drop-off
+    const maxPages = 10; // Increased max pages to ensure we hit the 50 song target
 
-    while (pagesFetched < maxPages && allSongs.length < 120) {
+    while (pagesFetched < maxPages && allSongs.length < 60) {
       const pageTokenParam = nextPageToken ? `&pageToken=${nextPageToken}` : "";
       
-      // Step A: Search for Video IDs (Max 50)
-      const searchUrl = `${BASE_URL}/search?part=id&maxResults=50&q=${encodeURIComponent(finalQuery)}&type=video&videoCategoryId=10&videoEmbeddable=true&key=${YOUTUBE_API_KEY}${pageTokenParam}`;
+      // Step A: Search for Video IDs (Max 50 per page)
+      // videoDuration=medium roughly targets 4-20 mins, short is <4. 
+      // We use 'any' duration in API and filter manually for strict 2-4 min range.
+      // videoCategoryId=10 is Music.
+      const searchUrl = `${BASE_URL}/search?part=id&maxResults=50&q=${encodeURIComponent(finalQuery)}&type=video&videoCategoryId=10&videoEmbeddable=true&order=${randomOrder}&key=${YOUTUBE_API_KEY}${pageTokenParam}`;
       
       const searchRes = await fetch(searchUrl);
       const searchData = await searchRes.json();
@@ -109,6 +122,8 @@ export const fetchPlaylistByContext = async (
                 })
                 .filter((song: any) => {
                     // Strict Filtering: > 2 mins (120s) AND < 4 mins (240s)
+                    // Must include this logic to ensure it's "Music" length
+                    // Also filter out things that are likely full albums (usually > 10 mins, handled by <4m check)
                     return song.durationVal > 120 && song.durationVal < 240;
                 });
 
@@ -121,7 +136,7 @@ export const fetchPlaylistByContext = async (
       if (!nextPageToken) break;
     }
 
-    // Deduplicate
+    // Deduplicate songs based on ID
     const uniqueSongs = Array.from(new Map(allSongs.map(song => [song.id, song])).values());
     
     return uniqueSongs;
