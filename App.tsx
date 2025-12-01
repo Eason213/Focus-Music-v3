@@ -71,12 +71,13 @@ export default function App() {
      }
   }, []);
 
-  const loadSongs = useCallback(async (query: string, isSearch: boolean = false, artistsOverride?: string[]) => {
+  const loadSongs = useCallback(async (categoryId: string, query: string, isSearch: boolean = false, artistsOverride?: string[]) => {
     setLoadingState(LoadingState.LOADING);
     setSongs([]);
     try {
       const artistsToUse = artistsOverride || favoriteArtistsNames;
-      const data = await fetchPlaylistByContext(query, isSearch ? [] : artistsToUse);
+      // Pass categoryId to service to handle specific filtering (e.g. female only)
+      const data = await fetchPlaylistByContext(categoryId, query, isSearch ? [] : artistsToUse);
       setSongs(data);
       setLoadingState(LoadingState.SUCCESS);
       if (isSearch) {
@@ -96,25 +97,26 @@ export default function App() {
     setIsMobileMenuOpen(false); 
     const cat = CATEGORIES.find(c => c.id === id);
     if (cat) {
-      loadSongs(cat.query);
+      loadSongs(cat.id, cat.query);
     }
   };
 
   const handleSearch = (query: string) => {
     setSelectedCategoryId(''); 
     setIsMobileMenuOpen(false); 
-    loadSongs(query, true);
+    // Use 'search' as category ID for search queries
+    loadSongs('search', query, true);
   };
 
   const handleArtistSave = (names: string[]) => {
       setFavoriteArtistsNames(names);
       if (!isSearching) {
-          loadSongs(currentCategory.query, false, names);
+          loadSongs(currentCategory.id, currentCategory.query, false, names);
       }
   };
 
   useEffect(() => {
-    loadSongs(currentCategory.query);
+    loadSongs(currentCategory.id, currentCategory.query);
   }, []); 
 
   useEffect(() => {
@@ -251,7 +253,6 @@ export default function App() {
           startSeconds: 0,
           suggestedQuality: 'small'
       });
-      //playerRef.current.playVideo(); // loadVideoById usually autoplays, but safe to call
     }
   };
 
@@ -411,7 +412,7 @@ export default function App() {
           songs={songs} 
           loadingState={loadingState} 
           categoryName={isSearching ? `Search: "${searchQueryDisplay}"` : currentCategory.name}
-          onRefresh={() => loadSongs(isSearching ? searchQueryDisplay : currentCategory.query, isSearching)}
+          onRefresh={() => loadSongs(currentCategory.id, isSearching ? searchQueryDisplay : currentCategory.query, isSearching)}
           onPlay={handlePlaySong}
           currentSong={currentSong}
           isPlaying={isPlaying}

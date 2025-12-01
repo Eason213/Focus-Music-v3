@@ -8,7 +8,10 @@ const YOUTUBE_API_KEY = "AIzaSyBpy0IZXf9kkkPh2FlO-UMTVXUSmNqqyTQ";
 
 const BASE_URL = "https://www.googleapis.com/youtube/v3";
 
+const FEMALE_ONLY_CATEGORIES = ['quick_picks', 'kpop_hits', 'sim_kpop', 'new_release'];
+
 export const fetchPlaylistByContext = async (
+  categoryId: string,
   query: string,
   favoriteArtists: string[] = []
 ): Promise<Song[]> => {
@@ -21,22 +24,34 @@ export const fetchPlaylistByContext = async (
     let allSongs: Song[] = [];
     let nextPageToken = "";
     
-    // Construct a weighted query: Base Query + (Random subset of Favorite Artists to influence results)
+    // Construct Query
+    let finalQuery = query;
+    
+    // 1. Artist weighting
     const artistString = favoriteArtists.length > 0 
-      ? ` ${favoriteArtists.slice(0, 5).join(' ')}` 
+      ? ` ${favoriteArtists.slice(0, 3).join(' ')}` 
       : "";
-      
-    const fullQuery = `${query}${artistString}`;
+    finalQuery += artistString;
 
-    // Loop to fetch at least 3 pages (50 results per page is max)
-    // 50 * 3 = 150 songs
+    // 2. Gender filtering (Except Mandopop & Search)
+    if (FEMALE_ONLY_CATEGORIES.includes(categoryId)) {
+       finalQuery += ` (female singer|girl group)`;
+    }
+
+    // 3. Cache busting / Randomness
+    const randomSort = Math.random() > 0.5 ? 'relevance' : 'date';
+
+    // Loop to fetch
+    // We fetch a bit more because client-side duration filtering might remove items
     let pagesFetched = 0;
-    const maxPages = 3; 
+    const maxPages = 4; 
 
-    while (pagesFetched < maxPages) {
+    while (pagesFetched < maxPages && allSongs.length < 50) {
       const pageTokenParam = nextPageToken ? `&pageToken=${nextPageToken}` : "";
-      
-      const searchUrl = `${BASE_URL}/search?part=snippet&maxResults=50&q=${encodeURIComponent(fullQuery)}&type=video&videoCategoryId=10&videoEmbeddable=true&videoDuration=short&fields=nextPageToken,items(id/videoId,snippet(title,channelTitle,thumbnails/high/url,thumbnails/medium/url,publishedAt))&key=${YOUTUBE_API_KEY}${pageTokenParam}`;
+      const cb = Date.now(); // cache buster
+
+      // REMOVED videoDuration=short to allow Mandopop (usually > 4 mins)
+      const searchUrl = `${BASE_URL}/search?part=snippet&maxResults=50&q=${encodeURIComponent(finalQuery)}&type=video&videoCategoryId=10&videoEmbeddable=true&order=${randomSort}&fields=nextPageToken,items(id/videoId,snippet(title,channelTitle,thumbnails/high/url,thumbnails/medium/url,publishedAt))&key=${YOUTUBE_API_KEY}${pageTokenParam}&_cb=${cb}`;
       
       const response = await fetch(searchUrl);
       const data = await response.json();
@@ -46,17 +61,39 @@ export const fetchPlaylistByContext = async (
         break;
       }
 
-      const pageSongs = data.items.map((item: any) => ({
-        id: item.id.videoId,
-        title: decodeHTMLEntities(item.snippet.title),
-        artist: item.snippet.channelTitle,
-        album: item.snippet.channelTitle, 
-        duration: "0:00", 
-        thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url,
-        year: item.snippet.publishedAt.substring(0, 4)
-      }));
+      const videoIds = data.items?.map((item: any) => item.id.videoId).join(',');
+      
+      if (videoIds) {
+          // Fetch Details for Duration
+          const detailsUrl = `${BASE_URL}/videos?part=contentDetails&id=${videoIds}&fields=items(id,contentDetails/duration)&key=${YOUTUBE_API_KEY}`;
+          const detailsResp = await fetch(detailsUrl);
+          const detailsData = await detailsResp.json();
+          
+          const durationMap = new Map();
+          detailsData.items?.forEach((item: any) => {
+              durationMap.set(item.id, parseDuration(item.contentDetails.duration));
+          });
 
-      allSongs = [...allSongs, ...pageSongs];
+          const pageSongs: Song[] = [];
+          
+          data.items.forEach((item: any) => {
+             const seconds = durationMap.get(item.id.videoId) || 0;
+             // Filter: > 60s (avoid shorts) AND < 300s (5 mins)
+             if (seconds > 60 && seconds < 300) {
+                 pageSongs.push({
+                    id: item.id.videoId,
+                    title: decodeHTMLEntities(item.snippet.title),
+                    artist: item.snippet.channelTitle,
+                    album: item.snippet.channelTitle, 
+                    duration: formatTime(seconds), 
+                    thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url,
+                    year: item.snippet.publishedAt.substring(0, 4)
+                 });
+             }
+          });
+          
+          allSongs = [...allSongs, ...pageSongs];
+      }
       
       nextPageToken = data.nextPageToken;
       pagesFetched++;
@@ -64,8 +101,14 @@ export const fetchPlaylistByContext = async (
       if (!nextPageToken) break;
     }
 
+    // Deduplicate
     const uniqueSongs = Array.from(new Map(allSongs.map(song => [song.id, song])).values());
     
+    // If we still have 0 songs (e.g. extremely strict filters), return mock to avoid empty screen
+    if (uniqueSongs.length === 0) {
+        return mockFallbackData();
+    }
+
     return uniqueSongs;
 
   } catch (error) {
@@ -74,6 +117,24 @@ export const fetchPlaylistByContext = async (
   }
 };
 
+function parseDuration(isoDuration: string): number {
+    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
+    const matches = isoDuration.match(regex);
+    if (!matches) return 0;
+    
+    const hours = parseInt(matches[1] || '0', 10);
+    const minutes = parseInt(matches[2] || '0', 10);
+    const seconds = parseInt(matches[3] || '0', 10);
+    
+    return (hours * 3600) + (minutes * 60) + seconds;
+}
+
+function formatTime(seconds: number) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function decodeHTMLEntities(text: string) {
   const textArea = document.createElement('textarea');
   textArea.innerHTML = text;
@@ -81,6 +142,5 @@ function decodeHTMLEntities(text: string) {
 }
 
 const mockFallbackData = (): Song[] => [
-    { id: '1', title: 'API KEY MISSING', artist: 'Please update services/youtubeService.ts', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/333/FFF?text=No+Key', year: '2024' },
-    { id: '2', title: 'Feature Requires API', artist: 'YouTube Data API v3', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/333/FFF?text=Error', year: '2024' },
+    { id: '1', title: 'API Limit Reached or No Results', artist: 'Please Check API Key', album: 'System', duration: '0:00', thumbnail: 'https://placehold.co/400x400/333/FFF?text=Error', year: '2024' },
 ];
