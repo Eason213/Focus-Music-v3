@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Song } from '../types';
 
@@ -35,6 +36,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const startYRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isDragging) {
@@ -83,13 +85,36 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       fn();
   };
 
+  // Fullscreen Swipe Gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    // Optional: Add rubber banding or transform visual feedback here
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (startYRef.current === null) return;
+    const diff = e.changedTouches[0].clientY - startYRef.current;
+    
+    // Swipe Down Threshold
+    if (diff > 80) {
+        setIsExpanded(false);
+    }
+    startYRef.current = null;
+  };
+
   return (
     <>
       {/* FULL SCREEN PLAYER */}
       <div 
-        className={`fixed inset-0 z-50 bg-black flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+        className={`fixed inset-0 z-50 bg-black flex flex-col transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] touch-none ${
             isExpanded ? 'translate-y-0' : 'translate-y-[100%]'
         }`}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         <div className="absolute inset-0 opacity-40 overflow-hidden pointer-events-none">
             {currentSong && (
@@ -103,7 +128,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         </div>
 
         <div className="relative z-10 flex flex-col h-full w-full max-w-lg mx-auto p-6 pt-safe-top pb-safe-bottom">
-            <div className="flex items-center justify-center h-12 mb-4 shrink-0 cursor-pointer" onClick={handleCollapse}>
+            <div className="flex items-center justify-center h-12 mb-4 shrink-0 cursor-pointer w-full" onClick={handleCollapse}>
                 <div className="w-12 h-1.5 bg-white/30 rounded-full hover:bg-white/50 transition-colors"></div>
             </div>
 
@@ -124,12 +149,12 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                     <h2 className="text-2xl font-bold text-white truncate leading-tight">{currentSong?.title || "Not Playing"}</h2>
                     <p className="text-lg text-zinc-400 font-medium truncate">{currentSong?.artist || "Select a song"}</p>
                 </div>
-                <button className="p-2 text-zinc-400 hover:text-white">
-                     <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                <button className="p-2 text-zinc-400 hover:text-white" onClick={handleCollapse}>
+                     <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
             </div>
 
-            <div className="mb-10 px-2">
+            <div className="mb-10 px-2" onTouchStart={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()}>
                 <div 
                     ref={progressBarRef}
                     className="relative w-full h-8 flex items-center cursor-pointer group"
