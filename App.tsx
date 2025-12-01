@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { SongList } from './components/SongList';
@@ -15,7 +16,7 @@ declare global {
 
 // Updated Categories
 const CATEGORIES: PlaylistCategory[] = [
-  { id: 'quick_picks', name: '歌曲快選', query: 'Popular music mix', description: 'Quick Picks' },
+  { id: 'quick_picks', name: '歌曲快選', query: 'Popular pop music mix', description: 'Quick Picks' },
   { id: 'kpop_hits', name: '韓國流行音樂熱門歌曲', query: 'K-Pop top hits 2024 official audio', description: 'K-Pop Hits' },
   { id: 'mandopop_hits', name: '華語流行音樂熱門歌曲', query: 'Top Mandopop hits 2024 official audio', description: 'Mandopop Hits' },
   { id: 'sim_kpop', name: '風格近似 kpop', query: 'Upbeat pop music similar to K-Pop', description: 'Similar to K-Pop' },
@@ -61,7 +62,6 @@ export default function App() {
 
   const currentCategory = CATEGORIES.find(c => c.id === selectedCategoryId) || CATEGORIES[0];
 
-  // Load favorite artists from local storage on mount
   useEffect(() => {
      const savedIds = localStorage.getItem('user_favorite_artists_ids');
      if (savedIds) {
@@ -71,12 +71,14 @@ export default function App() {
      }
   }, []);
 
-  const loadSongs = useCallback(async (query: string, isSearch: boolean = false, artistsOverride?: string[]) => {
+  const loadSongs = useCallback(async (query: string, isSearch: boolean = false, artistsOverride?: string[], categoryId?: string) => {
     setLoadingState(LoadingState.LOADING);
     setSongs([]);
     try {
       const artistsToUse = artistsOverride || favoriteArtistsNames;
-      const data = await fetchPlaylistByContext(query, isSearch ? [] : artistsToUse);
+      const targetCategoryId = categoryId || (isSearch ? 'search' : selectedCategoryId);
+      
+      const data = await fetchPlaylistByContext(query, targetCategoryId, isSearch ? [] : artistsToUse);
       setSongs(data);
       setLoadingState(LoadingState.SUCCESS);
       if (isSearch) {
@@ -89,14 +91,14 @@ export default function App() {
       console.error(error);
       setLoadingState(LoadingState.ERROR);
     }
-  }, [favoriteArtistsNames]);
+  }, [favoriteArtistsNames, selectedCategoryId]);
 
   const handleCategorySelect = (id: string) => {
     setSelectedCategoryId(id);
     setIsMobileMenuOpen(false); 
     const cat = CATEGORIES.find(c => c.id === id);
     if (cat) {
-      loadSongs(cat.query);
+      loadSongs(cat.query, false, undefined, id);
     }
   };
 
@@ -109,12 +111,12 @@ export default function App() {
   const handleArtistSave = (names: string[]) => {
       setFavoriteArtistsNames(names);
       if (!isSearching) {
-          loadSongs(currentCategory.query, false, names);
+          loadSongs(currentCategory.query, false, names, selectedCategoryId);
       }
   };
 
   useEffect(() => {
-    loadSongs(currentCategory.query);
+    loadSongs(currentCategory.query, false, undefined, selectedCategoryId);
   }, []); 
 
   useEffect(() => {
@@ -200,7 +202,6 @@ export default function App() {
         events: {
           'onReady': (event: any) => {
               setIsPlayerReady(true);
-              // Ensure audio is enabled
               event.target.unMute();
               event.target.setVolume(100);
           },
@@ -245,13 +246,11 @@ export default function App() {
     updateMediaSession(song);
     
     if (playerRef.current && playerRef.current.loadVideoById) {
-      // Speed Optimization: 'small' quality loads faster for audio
       playerRef.current.loadVideoById({
           videoId: song.id,
           startSeconds: 0,
           suggestedQuality: 'small'
       });
-      //playerRef.current.playVideo(); // loadVideoById usually autoplays, but safe to call
     }
   };
 
@@ -411,7 +410,7 @@ export default function App() {
           songs={songs} 
           loadingState={loadingState} 
           categoryName={isSearching ? `Search: "${searchQueryDisplay}"` : currentCategory.name}
-          onRefresh={() => loadSongs(isSearching ? searchQueryDisplay : currentCategory.query, isSearching)}
+          onRefresh={() => loadSongs(isSearching ? searchQueryDisplay : currentCategory.query, isSearching, undefined, selectedCategoryId)}
           onPlay={handlePlaySong}
           currentSong={currentSong}
           isPlaying={isPlaying}
