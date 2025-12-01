@@ -26,6 +26,13 @@ const AVAILABLE_ARTISTS: Omit<Artist, 'imageUrl'>[] = [
     { id: 'hebe', name: 'Hebe Tien', category: 'mandopop', tags: ['female', 'indie-pop', 'vocal'] },
     { id: 'ronghao', name: 'Li Ronghao', category: 'mandopop', tags: ['male', 'songwriter', 'chill'] },
     { id: 'soda', name: 'Sodagreen', category: 'mandopop', tags: ['band', 'indie', 'poetic'] },
+
+    // J-Pop (New)
+    { id: 'yoasobi', name: 'YOASOBI', category: 'kpop', tags: ['jpop', 'duo', 'hit'] },
+    { id: 'ado', name: 'Ado', category: 'kpop', tags: ['jpop', 'vocal', 'anime'] },
+    { id: 'kinggnu', name: 'King Gnu', category: 'kpop', tags: ['jpop', 'band', 'rock'] },
+    { id: 'kenshi', name: 'Kenshi Yonezu', category: 'kpop', tags: ['jpop', 'male', 'songwriter'] },
+    { id: 'utadahikaru', name: 'Utada Hikaru', category: 'kpop', tags: ['jpop', 'legend', 'rnb'] },
 ];
 
 interface ArtistSelectorProps {
@@ -89,7 +96,7 @@ export const ArtistSelector: React.FC<ArtistSelectorProps> = ({ isOpen, onClose,
                 <div className="p-6 border-b border-white/5 flex justify-between items-center bg-zinc-900/95 backdrop-blur z-10 rounded-t-3xl">
                     <div>
                         <h2 className="text-xl font-bold text-white">Customize Artists</h2>
-                        <p className="text-zinc-400 text-xs mt-0.5">Select to boost recommendations</p>
+                        <p className="text-zinc-400 text-xs mt-0.5">Select to boost recommendations (TW, KR, JP)</p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                         <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

@@ -13,13 +13,13 @@ declare global {
   }
 }
 
-// Updated Categories
+// Updated Categories with TW/KR/JP Region focus
 const CATEGORIES: PlaylistCategory[] = [
-  { id: 'quick_picks', name: '歌曲快選', query: 'Popular music mix', description: 'Quick Picks' },
+  { id: 'quick_picks', name: '歌曲快選', query: 'Popular music mix Taiwan Korea Japan', description: 'Quick Picks' },
   { id: 'kpop_hits', name: '韓國流行音樂熱門歌曲', query: 'K-Pop top hits 2024 official audio', description: 'K-Pop Hits' },
-  { id: 'mandopop_hits', name: '華語流行音樂熱門歌曲', query: 'Top Mandopop hits 2024 official audio', description: 'Mandopop Hits' },
+  { id: 'mandopop_hits', name: '華語流行音樂熱門歌曲', query: 'Top Mandopop hits 2024 Taiwan official audio', description: 'Mandopop Hits' },
   { id: 'sim_kpop', name: '風格近似 kpop', query: 'Upbeat pop music similar to K-Pop', description: 'Similar to K-Pop' },
-  { id: 'new_release', name: '最新發行', query: 'New music releases 2024 official audio', description: 'New Releases' },
+  { id: 'new_release', name: '最新發行', query: 'New music releases 2024 Taiwan Korea Japan', description: 'New Releases' },
 ];
 
 const USER_EMAIL = "kaco0213@gmail.com";

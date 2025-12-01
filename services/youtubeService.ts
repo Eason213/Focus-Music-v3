@@ -5,25 +5,24 @@ import { Song } from "../types";
 // 支援 3 組 Key 輪替，當某一組配額耗盡時會自動切換
 // ==================================================================================
 const YOUTUBE_API_KEYS = [
-  "AIzaSyBpy0IZXf9kkkPh2FlO-UMTVXUSmNqqyTQ",
+  "AIzaSyCV_CgzIQRrkfKt2F_imy-tOSiiA0f4P9I",
   "AIzaSyDWekcXfw_MXFnUdVEiMX5F-NBjJX2iabw",
-  "AIzaSyCV_CgzIQRrkfKt2F_imy-tOSiiA0f4P9I"
+  "AIzaSyBpy0IZXf9kkkPh2FlO-UMTVXUSmNqqyTQ"
 ];
 
 const BASE_URL = "https://www.googleapis.com/youtube/v3";
 
 // Categories that PREFER female artists (Soft Filter)
-// If these don't return enough songs, we fall back to general queries
 const FEMALE_PRIORITY_CATEGORIES = ['quick_picks', 'kpop_hits', 'sim_kpop', 'new_release'];
 
-// Backup queries to ensure we hit 50 songs if the specific filter is too strict
+// Backup queries focused on TW/KR/JP regions to ensure 50+ songs
 const BACKUP_QUERIES: Record<string, string> = {
-  'quick_picks': 'Popular music hits 2024 official audio',
+  'quick_picks': 'Top hits 2024 Taiwan Korea Japan', // Focused on TW/KR/JP
   'kpop_hits': 'K-Pop top 100 songs 2024',
-  'mandopop_hits': 'Top Mandopop songs 2024',
-  'sim_kpop': 'Upbeat pop dance songs 2024',
-  'new_release': 'New music releases 2024',
-  'search': '' // Search uses user query as backup
+  'mandopop_hits': 'Top Mandopop songs 2024 Taiwan', // Focused on TW market
+  'sim_kpop': 'Upbeat pop dance songs Korea Japan Taiwan',
+  'new_release': 'New music releases 2024 Taiwan Korea Japan', // Focused on TW/KR/JP
+  'search': '' 
 };
 
 // Helper to manage key rotation
@@ -96,8 +95,9 @@ export const fetchPlaylistByContext = async (
             const cb = Date.now(); // Cache buster
             const randomSort = Math.random() > 0.5 ? 'relevance' : 'date';
 
+            // ADDED: regionCode=TW to lock results to Taiwan region context
             const response = await fetchWithRotation((key) => 
-                `${BASE_URL}/search?part=snippet&maxResults=50&q=${encodeURIComponent(searchQuery)}&type=video&videoCategoryId=10&videoEmbeddable=true&order=${randomSort}&fields=nextPageToken,items(id/videoId,snippet(title,channelTitle,thumbnails/high/url,thumbnails/medium/url,publishedAt))&key=${key}${pageTokenParam}&_cb=${cb}`
+                `${BASE_URL}/search?part=snippet&maxResults=50&q=${encodeURIComponent(searchQuery)}&type=video&videoCategoryId=10&videoEmbeddable=true&regionCode=TW&order=${randomSort}&fields=nextPageToken,items(id/videoId,snippet(title,channelTitle,thumbnails/high/url,thumbnails/medium/url,publishedAt))&key=${key}${pageTokenParam}&_cb=${cb}`
             );
 
             if (!response.ok) break;
@@ -120,7 +120,6 @@ export const fetchPlaylistByContext = async (
 
                     data.items.forEach((item: any) => {
                         const vid = item.id.videoId;
-                        // Avoid duplicates immediately
                         if (uniqueSongsMap.has(vid)) return;
 
                         const seconds = durationMap.get(vid) || 0;
@@ -146,39 +145,32 @@ export const fetchPlaylistByContext = async (
         }
     };
 
-    // 1. PHASE ONE: Main Query with Preferences (e.g. Female Priority + Artists)
+    // 1. PHASE ONE: Main Query
     let mainQuery = query;
     
-    // Add Artist Weights (Top 3)
+    // Add Artist Weights
     const artistStr = favoriteArtists.slice(0, 3).join(' ');
     if (artistStr) mainQuery += ` ${artistStr}`;
 
-    // Apply Female Priority (Soft Filter)
+    // Apply Female Priority (Soft Filter) for specified categories
     if (FEMALE_PRIORITY_CATEGORIES.includes(categoryId)) {
        mainQuery += ` (female singer|girl group)`;
     }
 
-    // Try fetching with specific constraints first
     await fetchAndProcess(mainQuery, 10);
 
-    // 2. PHASE TWO: Gap Filling (Backup Query)
-    // If we haven't reached TARGET_COUNT (50), use a broader query
+    // 2. PHASE TWO: Gap Filling
     if (uniqueSongsMap.size < TARGET_COUNT) {
-        console.log(`Phase 1 found ${uniqueSongsMap.size} songs. Starting Phase 2 (Gap Filling)...`);
+        console.log(`Phase 1 found ${uniqueSongsMap.size} songs. Starting Phase 2 (Gap Filling for TW/KR/JP)...`);
         
-        // Determine backup query
         let backupQuery = BACKUP_QUERIES[categoryId] || query;
-        
-        // If it's a search, the backup is just the raw query without gender filters
         if (categoryId === 'search') backupQuery = query;
 
-        // Try fetching with broad constraints to fill the list
-        await fetchAndProcess(backupQuery, 20);
+        await fetchAndProcess(backupQuery, 30); // Increased pages for safety
     }
 
     const resultSongs = Array.from(uniqueSongsMap.values());
 
-    // Final fallback if absolutely nothing found
     if (resultSongs.length === 0) {
         return mockFallbackData();
     }
